@@ -71,9 +71,9 @@ const MONTHLY_ERP = {
   "2026-02": { rev_26:739562,  rev_25:996977,  margin:0.389, orders:512  },
   "2026-03": { rev_26:352815,  rev_25:528054,  margin:0.394, orders:275  },
 };
-// Per-month counts pulled live from HubSpot 2026-03-12
+// Per-month counts pulled live from HubSpot 2026-03-12 — static fallback
 // MQLs = date_became_marketing_qualified in month | SQLs = date_moved_to_qualified_or_further in month
-const MONTHLY_HS = {
+const STATIC_HS = {
   "2026-01": { mqls:127, sqls:5 },
   "2026-02": { mqls:191, sqls:9 },
   "2026-03": { mqls:72,  sqls:3 },
@@ -158,13 +158,56 @@ function getErp(months) {
   return { rev_26, rev_25, orders, margin, monthly, csmRows };
 }
 
-function getHs(months) {
-  const rows = months.map(m => MONTHLY_HS[m]).filter(Boolean);
+function getHs(months, hsData) {
+  const src = hsData || STATIC_HS;
+  const rows = months.map(m => src[m]).filter(Boolean);
   return {
     mqls:  rows.reduce((s,r) => s+r.mqls, 0),
     sqls:  rows.reduce((s,r) => s+r.sqls, 0),
     scale: months.length / 3,
   };
+}
+
+// ─── Live data hook ───────────────────────────────────────────────────────────
+function useLiveData(start, end) {
+  const [hsData, setHsData] = useState(STATIC_HS);
+  const [isLive, setIsLive] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState(null);
+
+  useEffect(() => {
+    if (!start) return;
+    const e = end || start;
+    const pad = d => d.toISOString().slice(0, 10);
+    const [lo, hi] = start <= e ? [start, e] : [e, start];
+    let cancelled = false;
+
+    fetch("/api/hubspot", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ dateStart: pad(lo), dateEnd: pad(hi) }),
+    })
+      .then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
+      .then(data => {
+        if (cancelled) return;
+        const merged = { ...STATIC_HS };
+        for (const [ym, vals] of Object.entries(data)) {
+          if (vals && typeof vals.mqls === "number") merged[ym] = vals;
+        }
+        setHsData(merged);
+        setIsLive(true);
+        setLastUpdated(new Date());
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setHsData(STATIC_HS);
+        setIsLive(false);
+        setLastUpdated(null);
+      });
+
+    return () => { cancelled = true; };
+  }, [start?.getTime(), end?.getTime()]);
+
+  return { hsData, isLive, lastUpdated };
 }
 
 // ─── Format helpers ───────────────────────────────────────────────────────────
@@ -517,8 +560,8 @@ function ExecView({ months }) {
 }
 
 // ─── SALES VIEW ───────────────────────────────────────────────────────────────
-function SalesView({ months }) {
-  const hs = getHs(months);
+function SalesView({ months, hsData }) {
+  const hs = getHs(months, hsData);
   const maxStg = Math.max(...STATIC.pipeline_stages.filter(s=>s.amount>0).map(s=>s.amount));
   const sqlMqlRate = hs.mqls > 0 ? pct(hs.sqls, hs.mqls) : 0;
 
@@ -625,8 +668,8 @@ function SalesView({ months }) {
 }
 
 // ─── MARKETING VIEW ───────────────────────────────────────────────────────────
-function MarketingView({ months }) {
-  const hs = getHs(months);
+function MarketingView({ months, hsData }) {
+  const hs = getHs(months, hsData);
   const sc = hs.scale;
   const ch = STATIC.channels.map(c => ({...c, mqls:Math.round(c.mqls*sc), sqls:Math.round(c.sqls*sc), pipe:Math.round(c.pipe*sc), won:Math.round(c.won*sc)}));
   const maxMql  = Math.max(...ch.map(c=>c.mqls));
@@ -788,6 +831,7 @@ export default function App() {
   const [end,   setEnd]   = useState(new Date(2026,2,11));
   const [rk,    setRk]    = useState(0);
 
+  const { hsData, isLive, lastUpdated } = useLiveData(start, end);
   const months = getActiveMonths(start, end);
   const Active = TABS.find(t => t.id===tab)?.View;
 
@@ -831,7 +875,12 @@ export default function App() {
               ))}
             </nav>
 
-            <div style={{fontSize:11.5,color:"var(--t3)",flexShrink:0,fontFamily:"var(--mono)"}}>As of Mar 11, 2026</div>
+            <div style={{display:"flex",alignItems:"center",gap:6,fontSize:11.5,color:"var(--t3)",flexShrink:0,fontFamily:"var(--mono)"}}>
+              <div style={{width:6,height:6,borderRadius:99,background:isLive?"var(--green)":"var(--amber)"}} />
+              {isLive
+                ? `Live · ${lastUpdated.toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"})}`
+                : "Cached"}
+            </div>
           </div>
         </header>
 
@@ -847,7 +896,7 @@ export default function App() {
             )}
           </div>
           <div key={rk}>
-            <Active months={months} />
+            <Active months={months} hsData={hsData} />
           </div>
         </main>
       </div>
