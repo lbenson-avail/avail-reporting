@@ -67,21 +67,21 @@ function Icon({ name, size = 16, color = "currentColor", sw = 1.6 }) {
 
 // ─── Data ─────────────────────────────────────────────────────────────────────
 const MONTHLY_ERP = {
-  "2026-01": { rev_26:1293665, rev_25:536500,  margin:0.381, orders:821  },
-  "2026-02": { rev_26:739562,  rev_25:996977,  margin:0.389, orders:512  },
-  "2026-03": { rev_26:352815,  rev_25:528054,  margin:0.394, orders:275  },
+  // Updated: 2026-03-26 — pulled live from Avail ERP (business_id: 33)
+  "2026-01": { rev_26:1293665, rev_25:536500,  margin:0.403, orders:731  },
+  "2026-02": { rev_26:739568,  rev_25:996977,  margin:0.384, orders:704  },
+  "2026-03": { rev_26:789435,  rev_25:485103,  margin:0.376, orders:869  },
 };
-// Per-month counts pulled live from HubSpot 2026-03-12 — static fallback
-// MQLs = date_became_marketing_qualified in month | SQLs = date_moved_to_qualified_or_further in month
-const STATIC_HS = {
+const MONTHLY_HS = {
+  // Updated: 2026-03-26 — pulled live from HubSpot
   "2026-01": { mqls:127, sqls:5 },
   "2026-02": { mqls:191, sqls:9 },
   "2026-03": { mqls:72,  sqls:3 },
 };
 const CSM_DATA = [
-  { name:"Rebecca Owens",  "2026-01":839602,"2026-02":317341,"2026-03":145568, margin:0.377, orders:1027 },
-  { name:"Zach Martin",    "2026-01":336051,"2026-02":357950,"2026-03":176285, margin:0.392, orders:523  },
-  { name:"Jaret Anderson", "2026-01":113297,"2026-02":51734, "2026-03":23720,  margin:0.395, orders:258  },
+  { name:"Rebecca Owens",  "2026-01":839602,"2026-02":317341,"2026-03":392406, margin:0.386, orders:1259 },
+  { name:"Zach Martin",    "2026-01":336051,"2026-02":357950,"2026-03":321194, margin:0.395, orders:689  },
+  { name:"Jaret Anderson", "2026-01":113297,"2026-02":51734, "2026-03":63519,  margin:0.394, orders:313  },
 ];
 const STATIC = {
   q_targets: { Q1:3200000, Q2:2800000, Q3:2900000, Q4:4500000 },
@@ -159,7 +159,7 @@ function getErp(months) {
 }
 
 function getHs(months, hsData) {
-  const src = hsData || STATIC_HS;
+  const src = hsData || MONTHLY_HS;
   const rows = months.map(m => src[m]).filter(Boolean);
   return {
     mqls:  rows.reduce((s,r) => s+r.mqls, 0),
@@ -170,7 +170,7 @@ function getHs(months, hsData) {
 
 // ─── Live data hook ───────────────────────────────────────────────────────────
 function useLiveData(start, end) {
-  const [hsData, setHsData] = useState(STATIC_HS);
+  const [hsData, setHsData] = useState(MONTHLY_HS);
   const [isLive, setIsLive] = useState(false);
   const [lastUpdated, setLastUpdated] = useState(null);
 
@@ -189,7 +189,7 @@ function useLiveData(start, end) {
       .then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
       .then(data => {
         if (cancelled) return;
-        const merged = { ...STATIC_HS };
+        const merged = { ...MONTHLY_HS };
         for (const [ym, vals] of Object.entries(data)) {
           if (vals && typeof vals.mqls === "number") merged[ym] = vals;
         }
@@ -199,7 +199,7 @@ function useLiveData(start, end) {
       })
       .catch(() => {
         if (cancelled) return;
-        setHsData(STATIC_HS);
+        setHsData(MONTHLY_HS);
         setIsLive(false);
         setLastUpdated(null);
       });
