@@ -13,6 +13,7 @@ import { MeetingShowRateCard } from '@/components/dashboard/MeetingShowRateCard'
 import { RepBreakdownTable } from '@/components/dashboard/RepBreakdownTable';
 import { LeadLists } from '@/components/dashboard/LeadLists';
 import { buildPresets, presetToRange } from '@/components/dashboard/DateRangePicker';
+import { TrendChip } from '@/components/dashboard/TrendChip';
 import { METRIC_DEFS } from '../lib/config.js';
 import { fmtDays, fmtDaysExact, fmtNum, fmtPct, fmtPctExact } from '@/lib/format';
 
@@ -35,7 +36,7 @@ function Dashboard() {
     document.getElementById('lead-lists')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
-  const { leads, deals, meetings, lastUpdated, refreshing, refresh } = useMetrics({
+  const { leads, deals, meetings, previous, lastUpdated, refreshing, refresh } = useMetrics({
     start: range.start,
     end: range.end,
     owner,
@@ -47,15 +48,24 @@ function Dashboard() {
 
   const leadKpis = useMemo(() => {
     const l = leads.data;
-    const qualifiedPct =
-      l && l.totalCreated > 0 && l.sqls?.count != null
-        ? (l.sqls.count / l.totalCreated) * 100
+    const pl = previous.leads;
+    const pct = (data) =>
+      data && data.totalCreated > 0 && data.sqls?.count != null
+        ? (data.sqls.count / data.totalCreated) * 100
         : null;
+    const qualifiedPct = pct(l);
     return [
       {
         def: METRIC_DEFS.totalLeads,
         value: l ? fmtNum(l.totalCreated) : '—',
         sub: 'Created in selected period',
+        trend: (
+          <TrendChip
+            current={l?.totalCreated}
+            previous={pl?.totalCreated}
+            detail={pl ? `Previous period: ${fmtNum(pl.totalCreated)} leads` : null}
+          />
+        ),
       },
       {
         def: METRIC_DEFS.sqls,
@@ -66,27 +76,58 @@ function Dashboard() {
             : l
               ? `of ${fmtNum(l.totalCreated)} leads created`
               : null,
+        trend: (
+          <TrendChip
+            current={l?.sqls?.count}
+            previous={pl?.sqls?.count}
+            detail={pl ? `Previous period: ${fmtNum(pl.sqls?.count)} SQLs` : null}
+          />
+        ),
       },
       {
         def: METRIC_DEFS.qualifiedPct,
         value: fmtPct(qualifiedPct),
         exact: fmtPctExact(qualifiedPct),
         sub: l ? `${fmtNum(l.sqls?.count)} qualified / ${fmtNum(l.totalCreated)} leads` : null,
+        trend: (
+          <TrendChip
+            current={qualifiedPct}
+            previous={pct(pl)}
+            mode="pts"
+            detail={pl ? `Previous period: ${fmtPct(pct(pl))}` : null}
+          />
+        ),
       },
       {
         def: METRIC_DEFS.speedToLead,
         value: fmtDays(l?.speedToLead?.days),
         exact: fmtDaysExact(l?.speedToLead?.days),
         sub: l ? `n = ${fmtNum(l.speedToLead?.n ?? 0)} leads` : null,
+        trend: (
+          <TrendChip
+            current={l?.speedToLead?.days}
+            previous={pl?.speedToLead?.days}
+            goodDirection="down"
+            detail={pl ? `Previous period: ${fmtDays(pl.speedToLead?.days)}` : null}
+          />
+        ),
       },
       {
         def: METRIC_DEFS.reachingToConnected,
         value: fmtDays(l?.reachingToConnected?.days),
         exact: fmtDaysExact(l?.reachingToConnected?.days),
         sub: l ? `n = ${fmtNum(l.reachingToConnected?.n ?? 0)} leads` : null,
+        trend: (
+          <TrendChip
+            current={l?.reachingToConnected?.days}
+            previous={pl?.reachingToConnected?.days}
+            goodDirection="down"
+            detail={pl ? `Previous period: ${fmtDays(pl.reachingToConnected?.days)}` : null}
+          />
+        ),
       },
     ].map((k) => ({ ...k, loading: leads.loading, error: leadErr }));
-  }, [leads, leadErr]);
+  }, [leads, previous.leads, leadErr]);
 
   return (
     <div className="bg-background min-h-screen">
@@ -114,7 +155,7 @@ function Dashboard() {
         <section aria-label="Lead distributions" className="grid grid-cols-1 gap-4 lg:grid-cols-3">
           <LeadStagesCard leads={leads} />
           <IcpFitCard leads={leads} onShowUnscored={showUnscored} />
-          <MeetingShowRateCard meetings={meetings} />
+          <MeetingShowRateCard meetings={meetings} previousMeetings={previous.meetings} />
         </section>
 
         <RepBreakdownTable leads={leads} />
@@ -124,7 +165,7 @@ function Dashboard() {
         {/* ── Deals ─────────────────────────────────────────────── */}
         <SectionHeading>Deals</SectionHeading>
 
-        <DealStageChart deals={deals} />
+        <DealStageChart deals={deals} previousDeals={previous.deals} />
 
         <PipelineValueCard deals={deals} />
 

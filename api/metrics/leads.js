@@ -238,12 +238,24 @@ async function compute({ startMs, endMs, ownerIds }) {
     };
   });
 
-  // Qualified / disqualified / unscored lists (capped) with company names.
-  const disqualifiedLeads = roles.disqualified
-    ? results.filter((l) => l.properties?.hs_pipeline_stage === roles.disqualified)
+  // Lead lists are CURRENT-stage views (the SQL metric above stays
+  // ever-entered): Qualified = sitting in Qualified Buyer now, Disqualified =
+  // sitting in Disqualified now, Unscored = active leads (not disqualified,
+  // not hidden stages) missing an ICP score.
+  const currentStage = (l) => l.properties?.hs_pipeline_stage;
+  const qualifiedStageLeads = roles.qualified
+    ? results.filter((l) => currentStage(l) === roles.qualified)
     : [];
-  const unscoredLeads = results.filter((l) => !l.properties?.[PROPS.leadIcpFit]);
-  const qualifiedRows = qualifiedLeads.slice(0, FETCH_CAPS.listRows);
+  const disqualifiedLeads = roles.disqualified
+    ? results.filter((l) => currentStage(l) === roles.disqualified)
+    : [];
+  const unscoredLeads = results.filter(
+    (l) =>
+      !l.properties?.[PROPS.leadIcpFit] &&
+      currentStage(l) !== roles.disqualified &&
+      !hideRe.test(stageLabel.get(currentStage(l)) || '')
+  );
+  const qualifiedRows = qualifiedStageLeads.slice(0, FETCH_CAPS.listRows);
   const disqualifiedRows = disqualifiedLeads.slice(0, FETCH_CAPS.listRows);
   const unscoredRows = unscoredLeads.slice(0, FETCH_CAPS.listRows);
 
@@ -299,7 +311,7 @@ async function compute({ startMs, endMs, ownerIds }) {
       ownerId: l.properties?.hubspot_owner_id,
     })),
     listCaps: {
-      qualified: { shown: qualifiedRows.length, total: qualifiedLeads.length },
+      qualified: { shown: qualifiedRows.length, total: qualifiedStageLeads.length },
       disqualified: { shown: disqualifiedRows.length, total: disqualifiedLeads.length },
       unscored: { shown: unscoredRows.length, total: unscoredLeads.length },
     },

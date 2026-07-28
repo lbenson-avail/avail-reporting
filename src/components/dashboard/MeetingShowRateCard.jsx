@@ -5,6 +5,7 @@ import { fmtNum, fmtPct, fmtPctExact } from '@/lib/format';
 import { BarRow } from './BarRow';
 import { ExactValue } from './ExactValue';
 import { InfoTip } from './InfoTip';
+import { TrendChip } from './TrendChip';
 
 const OUTCOME_LABELS = {
   SCHEDULED: 'Scheduled',
@@ -14,7 +15,7 @@ const OUTCOME_LABELS = {
   CANCELED: 'Canceled',
 };
 
-export function MeetingShowRateCard({ meetings }) {
+export function MeetingShowRateCard({ meetings, previousMeetings }) {
   const def = METRIC_DEFS.meetingShowRate;
   const d = meetings.data;
   const max = Math.max(1, d?.missingOutcome ?? 0, ...MEETING_OUTCOMES.map((o) => d?.counts?.[o] ?? 0));
@@ -22,7 +23,7 @@ export function MeetingShowRateCard({ meetings }) {
   return (
     <Card className="gap-3">
       <CardHeader>
-        <CardTitle className="flex items-center justify-between text-sm font-medium">
+        <CardTitle className="flex items-center gap-1.5 text-sm font-medium">
           {def.title}
           <InfoTip text={def.tooltip} />
         </CardTitle>
@@ -39,6 +40,16 @@ export function MeetingShowRateCard({ meetings }) {
                 display={fmtPct(d.showRate)}
                 exact={fmtPctExact(d.showRate)}
                 className="text-2xl font-semibold tracking-tight tabular-nums"
+              />
+              <TrendChip
+                current={d.showRate}
+                previous={previousMeetings?.showRate}
+                mode="pts"
+                detail={
+                  previousMeetings
+                    ? `Previous period: ${fmtPct(previousMeetings.showRate)}`
+                    : null
+                }
               />
               <span className="text-muted-foreground text-xs">
                 {fmtNum(d.completed)} of {fmtNum(d.booked)} meetings completed

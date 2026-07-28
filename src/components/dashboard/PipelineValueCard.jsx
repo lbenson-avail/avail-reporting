@@ -22,7 +22,7 @@ export function PipelineValueCard({ deals }) {
   return (
     <Card className="gap-3">
       <CardHeader>
-        <CardTitle className="flex items-center justify-between text-sm font-medium">
+        <CardTitle className="flex items-center gap-1.5 text-sm font-medium">
           {def.title}
           <InfoTip text={def.tooltip} />
         </CardTitle>

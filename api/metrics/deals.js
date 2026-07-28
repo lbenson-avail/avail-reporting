@@ -41,10 +41,12 @@ async function compute({ startMs, endMs, ownerIds }) {
     ],
   });
 
+  const DEALS_PER_STAGE = 25; // hover detail cap; counts stay exact
+
   const stageIndex = new Map(DEAL_STAGES.map((s) => [s.id, s]));
   const byStage = new Map();
   for (const s of DEAL_STAGES) {
-    byStage.set(s.id, { ...s, count: 0, raw: 0, weighted: 0 });
+    byStage.set(s.id, { ...s, count: 0, raw: 0, weighted: 0, byOwner: {}, deals: [] });
   }
   const closedWon = {
     id: CLOSED_WON_STAGE_ID,
@@ -54,8 +56,21 @@ async function compute({ startMs, endMs, ownerIds }) {
     count: 0,
     raw: 0,
     weighted: 0,
+    byOwner: {},
+    deals: [],
   };
   let closedLostCount = 0;
+
+  const tally = (row, p, spend) => {
+    row.count++;
+    row.raw += spend;
+    row.weighted += spend * row.weight;
+    const ownerId = p.hubspot_owner_id || 'unknown';
+    row.byOwner[ownerId] = (row.byOwner[ownerId] || 0) + 1;
+    if (row.deals.length < DEALS_PER_STAGE) {
+      row.deals.push({ name: p.dealname || 'Unnamed deal', ownerId });
+    }
+  };
 
   for (const deal of created.results) {
     const p = deal.properties || {};
@@ -63,14 +78,9 @@ async function compute({ startMs, endMs, ownerIds }) {
     if (p.dealstage === CLOSED_LOST_STAGE_ID) {
       closedLostCount++;
     } else if (p.dealstage === CLOSED_WON_STAGE_ID) {
-      closedWon.count++;
-      closedWon.raw += spend;
-      closedWon.weighted += spend * CLOSED_WON_WEIGHT;
+      tally(closedWon, p, spend);
     } else if (stageIndex.has(p.dealstage)) {
-      const row = byStage.get(p.dealstage);
-      row.count++;
-      row.raw += spend;
-      row.weighted += spend * row.weight;
+      tally(byStage.get(p.dealstage), p, spend);
     }
   }
 
@@ -95,7 +105,14 @@ async function compute({ startMs, endMs, ownerIds }) {
   const allStages = [...openStages, closedWon];
 
   return {
-    stageCounts: allStages.map(({ id, label, short, count }) => ({ id, label, short, count })),
+    stageCounts: allStages.map(({ id, label, short, count, byOwner, deals }) => ({
+      id,
+      label,
+      short,
+      count,
+      byOwner,
+      deals,
+    })),
     closedLostCount,
     blended: {
       byStage: allStages.map(({ id, label, short, weight, raw, weighted }) => ({

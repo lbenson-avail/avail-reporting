@@ -6,6 +6,15 @@ import { BarRow } from './BarRow';
 import { InfoTip } from './InfoTip';
 import { LeadsError } from './LeadsError';
 
+// Fit is a judgment scale, so the bars wear status colors — the row label
+// always carries the meaning alongside the hue.
+export const ICP_COLORS = {
+  'Strong Fit': 'var(--viz-good)',
+  'Moderate Fit': 'var(--viz-warning)',
+  'Weak Fit': 'var(--viz-lost)',
+  'Not a Fit': 'var(--viz-bad-dark)',
+};
+
 export function IcpFitCard({ leads, onShowUnscored }) {
   const def = METRIC_DEFS.icpFits;
   const icp = leads.data?.icp;
@@ -14,7 +23,7 @@ export function IcpFitCard({ leads, onShowUnscored }) {
   return (
     <Card className="gap-3">
       <CardHeader>
-        <CardTitle className="flex items-center justify-between text-sm font-medium">
+        <CardTitle className="flex items-center gap-1.5 text-sm font-medium">
           {def.title}
           <InfoTip text={def.tooltip} />
         </CardTitle>
@@ -27,8 +36,15 @@ export function IcpFitCard({ leads, onShowUnscored }) {
         ) : (
           <>
             {icp.counts.map((c) => (
-              <BarRow key={c.category} label={c.category} value={c.count} max={max} />
+              <BarRow
+                key={c.category}
+                label={c.category}
+                value={c.count}
+                max={max}
+                color={ICP_COLORS[c.category] || 'var(--viz-cat-1)'}
+              />
             ))}
+            <BarRow label="Unscored" value={icp.unscored} max={max} color="var(--muted-foreground)" />
             {icp.unscored > 0 ? (
               <button
                 type="button"

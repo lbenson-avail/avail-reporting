@@ -99,6 +99,8 @@
   --viz-won: #006300;
   --viz-lost: #d03b3b;
   --viz-warning: #b45309;
+  --viz-good: #0ca30c;
+  --viz-bad-dark: #8f2727;
 }
 
 .dark {
@@ -112,6 +114,8 @@
   --viz-won: #0ca30c;
   --viz-lost: #e66767;
   --viz-warning: #fab219;
+  --viz-good: #0ca30c;
+  --viz-bad-dark: #c25454;
 }
 
 @layer base {

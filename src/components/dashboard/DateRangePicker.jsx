@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { CalendarIcon, Check } from 'lucide-react';
 import {
   endOfMonth,
@@ -38,30 +38,40 @@ export function presetToRange(preset) {
 export function DateRangePicker({ range, onChange }) {
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState();
-  const presets = useMemo(() => buildPresets(), []);
+  // Recomputed every render so "This month" / "Last 30 days" never go stale
+  // in a tab left open across days.
+  const presets = buildPresets();
 
   const display =
     range.key === 'custom'
       ? `${format(new Date(`${range.start}T00:00:00`), 'MMM d, yyyy')} – ${format(new Date(`${range.end}T00:00:00`), 'MMM d, yyyy')}`
       : range.label;
 
+  const commit = (from, to) => {
+    onChange({ key: 'custom', label: 'Custom', start: toParam(from), end: toParam(to) });
+    setOpen(false);
+    setDraft(undefined);
+  };
+
   const applyDraft = (selected) => {
     setDraft(selected);
     // First click yields from === to; wait for a second, distinct day.
     if (selected?.from && selected?.to && selected.to.getTime() !== selected.from.getTime()) {
-      onChange({
-        key: 'custom',
-        label: 'Custom',
-        start: toParam(selected.from),
-        end: toParam(selected.to),
-      });
-      setOpen(false);
-      setDraft(undefined);
+      commit(selected.from, selected.to);
+    }
+  };
+
+  // Closing with a single day picked applies that day as a one-day range,
+  // so a selection always takes effect.
+  const onOpenChange = (next) => {
+    setOpen(next);
+    if (!next && draft?.from) {
+      commit(draft.from, draft.to || draft.from);
     }
   };
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={onOpenChange}>
       <PopoverTrigger asChild>
         <Button variant="outline" size="sm" className="gap-2 font-normal">
           <CalendarIcon className="size-4" />

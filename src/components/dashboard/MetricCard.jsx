@@ -5,12 +5,12 @@ import { ExactValue } from './ExactValue';
 import { cn } from '@/lib/utils';
 
 // Generic KPI card: label + tooltip, one hero figure (rounded, exact on
-// hover when `exact` is provided), an optional sub line.
-export function MetricCard({ def, value, exact, sub, loading, error, accentClass, children }) {
+// hover when `exact` is provided), optional trend chip and sub line.
+export function MetricCard({ def, value, exact, trend, sub, loading, error, accentClass, children }) {
   return (
     <Card className="gap-0 py-4">
       <CardContent className="px-4">
-        <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-1.5">
           <span className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
             {def.title}
           </span>
@@ -24,11 +24,14 @@ export function MetricCard({ def, value, exact, sub, loading, error, accentClass
               Unavailable
             </span>
           ) : (
-            <ExactValue
-              display={value}
-              exact={exact}
-              className={cn('text-2xl font-semibold tracking-tight tabular-nums', accentClass)}
-            />
+            <span className="flex items-baseline gap-2">
+              <ExactValue
+                display={value}
+                exact={exact}
+                className={cn('text-2xl font-semibold tracking-tight tabular-nums', accentClass)}
+              />
+              {trend}
+            </span>
           )}
         </div>
         {!loading && !error && sub && (

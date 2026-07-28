@@ -27,11 +27,13 @@ import { LeadsError } from './LeadsError';
 
 const ownerShort = (ownerId) => SALES_OWNERS.find((o) => o.id === ownerId)?.shortName || '—';
 
-const ICP_BADGE = {
-  'Strong Fit': 'default',
-  'Moderate Fit': 'secondary',
-  'Weak Fit': 'outline',
-  'Not a Fit': 'outline',
+// Fit pills: green / yellow / red, grey for unscored — label always present,
+// so color reinforces rather than carries the meaning.
+const ICP_BADGE_CLASS = {
+  'Strong Fit': 'border-transparent bg-green-100 text-green-900 dark:bg-green-950 dark:text-green-200',
+  'Moderate Fit': 'border-transparent bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-200',
+  'Weak Fit': 'border-transparent bg-red-100 text-red-900 dark:bg-red-950 dark:text-red-200',
+  'Not a Fit': 'border-transparent bg-red-200 text-red-950 dark:bg-red-900 dark:text-red-100',
 };
 
 // Client-side paginated table shared by the three lead lists.
@@ -149,9 +151,13 @@ function CapNote({ cap }) {
 
 const icpCell = (l) =>
   l.icpFit ? (
-    <Badge variant={ICP_BADGE[l.icpFit] || 'outline'}>{l.icpFit}</Badge>
+    <Badge variant="outline" className={ICP_BADGE_CLASS[l.icpFit]}>
+      {l.icpFit}
+    </Badge>
   ) : (
-    <span className="text-muted-foreground">Unscored</span>
+    <Badge variant="outline" className="bg-muted text-muted-foreground border-transparent">
+      Unscored
+    </Badge>
   );
 
 // Deep link to the lead record in HubSpot (0-136 = Leads object) so reps can

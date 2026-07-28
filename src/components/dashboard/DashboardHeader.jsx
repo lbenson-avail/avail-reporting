@@ -10,6 +10,7 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { SALES_OWNERS } from '../../../lib/config.js';
 import { timeAgo } from '@/lib/format';
+import { AvailLogo } from '@/components/AvailLogo';
 import { DateRangePicker } from './DateRangePicker';
 import { cn } from '@/lib/utils';
 
@@ -26,12 +27,11 @@ export function DashboardHeader({
   return (
     <header className="bg-background/90 sticky top-0 z-40 border-b backdrop-blur">
       <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-3 px-4 py-3 sm:px-6">
-        <div className="mr-auto">
-          <h1 className="text-base leading-tight font-semibold">Avail Sales Dashboard</h1>
-          <p className="text-muted-foreground text-xs">
-            Live from HubSpot · {SALES_OWNERS.map((o) => o.shortName).join(' & ')}
-          </p>
-        </div>
+        <h1 className="mr-auto flex items-center gap-3">
+          <AvailLogo />
+          <span aria-hidden="true" className="bg-border h-5 w-px" />
+          <span className="text-base leading-tight font-semibold">Sales Dashboard</span>
+        </h1>
 
         {truncated && (
           <Tooltip>
@@ -53,7 +53,7 @@ export function DashboardHeader({
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">Both reps</SelectItem>
+            <SelectItem value="all">All Reps</SelectItem>
             {SALES_OWNERS.map((o) => (
               <SelectItem key={o.id} value={o.id}>
                 {o.name}

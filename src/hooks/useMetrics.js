@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { fetchJson } from '@/lib/api';
 import { POLL_INTERVAL_MS } from '../../lib/config.js';
 
@@ -10,6 +10,21 @@ const ENDPOINTS = {
 
 const initialSection = { data: null, error: null, loading: true };
 
+// The window of the same length immediately before [start, end] — the
+// comparison period for trend indicators. Null for all-time.
+export function previousRange(start, end) {
+  if (!start || !end) return null;
+  const s = new Date(`${start}T00:00:00Z`);
+  const e = new Date(`${end}T00:00:00Z`);
+  const days = Math.round((e - s) / 86400000) + 1;
+  const prevEnd = new Date(s);
+  prevEnd.setUTCDate(prevEnd.getUTCDate() - 1);
+  const prevStart = new Date(prevEnd);
+  prevStart.setUTCDate(prevStart.getUTCDate() - (days - 1));
+  const iso = (d) => d.toISOString().slice(0, 10);
+  return { start: iso(prevStart), end: iso(prevEnd) };
+}
+
 // Fetches all three metric endpoints for the given filters; keeps each
 // section's state independent so one failure doesn't blank the page.
 // Auto-refreshes on an interval and when the tab regains focus.
@@ -19,9 +34,12 @@ export function useMetrics({ start, end, owner }) {
     deals: initialSection,
     meetings: initialSection,
   });
+  const [previous, setPrevious] = useState({ leads: null, deals: null, meetings: null });
   const [lastUpdated, setLastUpdated] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
   const generation = useRef(0);
+
+  const prevRange = useMemo(() => previousRange(start, end), [start, end]);
 
   const load = useCallback(async () => {
     const gen = ++generation.current;
@@ -31,10 +49,11 @@ export function useMetrics({ start, end, owner }) {
       deals: { ...prev.deals, loading: true },
       meetings: { ...prev.meetings, loading: true },
     }));
+    setPrevious({ leads: null, deals: null, meetings: null });
 
     const params = { start, end, owner };
-    await Promise.all(
-      Object.entries(ENDPOINTS).map(async ([name, path]) => {
+    await Promise.all([
+      ...Object.entries(ENDPOINTS).map(async ([name, path]) => {
         try {
           const data = await fetchJson(path, params);
           if (generation.current !== gen) return;
@@ -46,14 +65,26 @@ export function useMetrics({ start, end, owner }) {
             [name]: { data: prev[name].data, error: err, loading: false },
           }));
         }
-      })
-    );
+      }),
+      // Previous period, for trends — best effort, never blocks the page.
+      ...(prevRange
+        ? Object.entries(ENDPOINTS).map(async ([name, path]) => {
+            try {
+              const data = await fetchJson(path, { ...prevRange, owner });
+              if (generation.current !== gen) return;
+              setPrevious((prev) => ({ ...prev, [name]: data }));
+            } catch {
+              /* no trend for this section */
+            }
+          })
+        : []),
+    ]);
 
     if (generation.current === gen) {
       setLastUpdated(new Date());
       setRefreshing(false);
     }
-  }, [start, end, owner]);
+  }, [start, end, owner, prevRange]);
 
   useEffect(() => {
     load();
@@ -68,5 +99,5 @@ export function useMetrics({ start, end, owner }) {
     };
   }, [load]);
 
-  return { ...sections, lastUpdated, refreshing, refresh: load };
+  return { ...sections, previous, lastUpdated, refreshing, refresh: load };
 }

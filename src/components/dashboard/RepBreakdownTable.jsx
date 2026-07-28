@@ -13,13 +13,7 @@ import { fmtNum, fmtPct } from '@/lib/format';
 import { InfoTip } from './InfoTip';
 import { LeadsError } from './LeadsError';
 
-// Rep identity color follows the entity: slot 1 = first owner, slot 2 = second,
-// regardless of filters — with the rep's name always beside the dot.
-const REP_COLORS = ['var(--viz-cat-1)', 'var(--viz-cat-2)'];
-const repColor = (ownerId) =>
-  REP_COLORS[SALES_OWNERS.findIndex((o) => o.id === ownerId)] ?? 'var(--muted-foreground)';
-
-const ownerName = (ownerId) => SALES_OWNERS.find((o) => o.id === ownerId)?.name || ownerId;
+import { repColor, repName as ownerName } from '@/lib/repColors';
 
 export function RepBreakdownTable({ leads }) {
   const def = METRIC_DEFS.repBreakdown;
@@ -29,7 +23,7 @@ export function RepBreakdownTable({ leads }) {
   return (
     <Card className="gap-3">
       <CardHeader>
-        <CardTitle className="flex items-center justify-between text-sm font-medium">
+        <CardTitle className="flex items-center gap-1.5 text-sm font-medium">
           {def.title}
           <InfoTip text={def.tooltip} />
         </CardTitle>
