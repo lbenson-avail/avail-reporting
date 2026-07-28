@@ -173,12 +173,20 @@ export function rangeFilter(propertyName, startMs, endMs) {
   };
 }
 
-// Average of (bMs − aMs) in days over rows where both timestamps exist.
+// HubSpot returns datetimes as ISO strings or epoch-ms strings depending on
+// the property; accept both.
+const toMs = (v) => {
+  if (v == null || v === '') return NaN;
+  if (typeof v === 'number') return v;
+  return /^\d+$/.test(v) ? Number(v) : Date.parse(v);
+};
+
+// Average of (b − a) in days over rows where both timestamps exist.
 export function avgDays(pairs) {
   const diffs = pairs
     .map(([a, b]) => {
-      const t0 = a ? Date.parse(a) : NaN;
-      const t1 = b ? Date.parse(b) : NaN;
+      const t0 = toMs(a);
+      const t1 = toMs(b);
       return Number.isFinite(t0) && Number.isFinite(t1) && t1 >= t0 ? t1 - t0 : null;
     })
     .filter((d) => d !== null);

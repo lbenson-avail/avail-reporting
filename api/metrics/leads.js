@@ -92,9 +92,18 @@ async function compute({ startMs, endMs, ownerIds }) {
   const { stages, roles } = await getLeadStages();
   const stageLabel = new Map(stages.map((s) => [s.id, s.label]));
 
-  const roleProps = Object.values(roles)
-    .filter(Boolean)
-    .map((id) => dateEnteredProp(id));
+  // Stage-entry timestamps: portals expose these under `hs_v2_date_entered_<id>`
+  // and/or the legacy `hs_date_entered_<id>` naming, and which stages carry
+  // which varies. Request both and read whichever is populated.
+  const legacyEnteredProp = (stageId) => `hs_date_entered_${stageId}`;
+  const roleIds = Object.values(roles).filter(Boolean);
+  const roleProps = roleIds.flatMap((id) => [dateEnteredProp(id), legacyEnteredProp(id)]);
+  const enteredAt = (lead, stageId) =>
+    stageId
+      ? lead.properties?.[dateEnteredProp(stageId)] ||
+        lead.properties?.[legacyEnteredProp(stageId)] ||
+        null
+      : null;
 
   const filters = [ownerFilter(ownerIds)];
   if (startMs != null) filters.push(rangeFilter(PROPS.leadCreateDate, startMs, endMs));
@@ -113,10 +122,6 @@ async function compute({ startMs, endMs, ownerIds }) {
     sorts: [{ propertyName: PROPS.leadCreateDate, direction: 'DESCENDING' }],
   });
 
-  const enteredQualified = roles.qualified ? dateEnteredProp(roles.qualified) : null;
-  const enteredReaching = roles.reachingOut ? dateEnteredProp(roles.reachingOut) : null;
-  const enteredConnected = roles.connected ? dateEnteredProp(roles.connected) : null;
-
   // Leads by current stage (in pipeline display order).
   const stageCounts = stages.map((s) => ({
     id: s.id,
@@ -125,20 +130,37 @@ async function compute({ startMs, endMs, ownerIds }) {
   }));
 
   // SQLs — has EVER entered the Qualified Buyer stage.
-  const qualifiedLeads = enteredQualified
-    ? results.filter((l) => l.properties?.[enteredQualified])
+  const qualifiedLeads = roles.qualified
+    ? results.filter((l) => enteredAt(l, roles.qualified))
     : [];
 
   // Timing metrics.
-  const speedToLead = enteredReaching
+  const speedToLead = roles.reachingOut
     ? avgDays(
-        results.map((l) => [l.properties?.[PROPS.leadCreateDate], l.properties?.[enteredReaching]])
+        results.map((l) => [l.properties?.[PROPS.leadCreateDate], enteredAt(l, roles.reachingOut)])
       )
     : { days: null, n: 0 };
   const reachingToConnected =
-    enteredReaching && enteredConnected
-      ? avgDays(results.map((l) => [l.properties?.[enteredReaching], l.properties?.[enteredConnected]]))
+    roles.reachingOut && roles.connected
+      ? avgDays(
+          results.map((l) => [enteredAt(l, roles.reachingOut), enteredAt(l, roles.connected)])
+        )
       : { days: null, n: 0 };
+
+  // Per-role visibility into which timestamp naming this portal populates —
+  // makes an empty timing metric diagnosable from the API response.
+  const timingDiagnostics = Object.fromEntries(
+    Object.entries(roles).map(([role, id]) => [
+      role,
+      id
+        ? {
+            stageId: id,
+            v2: results.filter((l) => l.properties?.[dateEnteredProp(id)]).length,
+            legacy: results.filter((l) => l.properties?.[legacyEnteredProp(id)]).length,
+          }
+        : null,
+    ])
+  );
 
   // ICP fit distribution.
   const icpCounts = ICP_CATEGORIES.map((cat) => ({
@@ -154,7 +176,7 @@ async function compute({ startMs, endMs, ownerIds }) {
       ownerId,
       created: mine.length,
       share: results.length > 0 ? (mine.length / results.length) * 100 : 0,
-      sqls: enteredQualified ? mine.filter((l) => l.properties?.[enteredQualified]).length : null,
+      sqls: roles.qualified ? mine.filter((l) => enteredAt(l, roles.qualified)).length : null,
       stageCounts: stages.map((s) => ({
         id: s.id,
         count: mine.filter((l) => l.properties?.hs_pipeline_stage === s.id).length,
@@ -179,11 +201,12 @@ async function compute({ startMs, endMs, ownerIds }) {
     roles: Object.fromEntries(
       Object.entries(roles).map(([k, id]) => [k, id ? { id, label: stageLabel.get(id) } : null])
     ),
-    sqls: enteredQualified
+    sqls: roles.qualified
       ? { count: qualifiedLeads.length }
       : { count: null, error: 'qualified_stage_not_found' },
     speedToLead,
     reachingToConnected,
+    timingDiagnostics,
     icp: { counts: icpCounts, unscored: icpUnscored },
     repBreakdown,
     qualifiedList: qualifiedRows.map((l) => ({
@@ -191,7 +214,7 @@ async function compute({ startMs, endMs, ownerIds }) {
       name: l.properties?.[PROPS.leadName] || null,
       company: companyNames.get(String(l.id)),
       icpFit: l.properties?.[PROPS.leadIcpFit] || null,
-      qualifiedAt: l.properties?.[enteredQualified] || null,
+      qualifiedAt: enteredAt(l, roles.qualified),
       ownerId: l.properties?.hubspot_owner_id,
     })),
     disqualifiedList: disqualifiedRows.map((l) => ({
