@@ -27,6 +27,13 @@ function SectionHeading({ children }) {
 function Dashboard() {
   const [range, setRange] = useState(() => presetToRange(buildPresets()[0])); // This month
   const [owner, setOwner] = useState(null);
+  const [listsTab, setListsTab] = useState('qualified');
+
+  // "N leads not yet scored" in the ICP card jumps straight to the fix-it list.
+  const showUnscored = () => {
+    setListsTab('unscored');
+    document.getElementById('lead-lists')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
 
   const { leads, deals, meetings, lastUpdated, refreshing, refresh } = useMetrics({
     start: range.start,
@@ -106,13 +113,13 @@ function Dashboard() {
 
         <section aria-label="Lead distributions" className="grid grid-cols-1 gap-4 lg:grid-cols-3">
           <LeadStagesCard leads={leads} />
-          <IcpFitCard leads={leads} />
+          <IcpFitCard leads={leads} onShowUnscored={showUnscored} />
           <MeetingShowRateCard meetings={meetings} />
         </section>
 
         <RepBreakdownTable leads={leads} />
 
-        <LeadLists leads={leads} />
+        <LeadLists leads={leads} tab={listsTab} onTabChange={setListsTab} />
 
         {/* ── Deals ─────────────────────────────────────────────── */}
         <SectionHeading>Deals</SectionHeading>

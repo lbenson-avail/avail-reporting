@@ -6,7 +6,7 @@ import { BarRow } from './BarRow';
 import { InfoTip } from './InfoTip';
 import { LeadsError } from './LeadsError';
 
-export function IcpFitCard({ leads }) {
+export function IcpFitCard({ leads, onShowUnscored }) {
   const def = METRIC_DEFS.icpFits;
   const icp = leads.data?.icp;
   const max = Math.max(1, ...(icp?.counts || []).map((c) => c.count));
@@ -29,9 +29,18 @@ export function IcpFitCard({ leads }) {
             {icp.counts.map((c) => (
               <BarRow key={c.category} label={c.category} value={c.count} max={max} />
             ))}
-            <p className="text-muted-foreground mt-2 text-xs">
-              {fmtNum(icp.unscored)} lead{icp.unscored === 1 ? '' : 's'} not yet scored
-            </p>
+            {icp.unscored > 0 ? (
+              <button
+                type="button"
+                onClick={onShowUnscored}
+                className="text-muted-foreground hover:text-foreground focus-visible:ring-ring/50 mt-2 rounded-sm text-xs underline decoration-dotted underline-offset-4 outline-none focus-visible:ring-[3px]"
+              >
+                {fmtNum(icp.unscored)} lead{icp.unscored === 1 ? '' : 's'} not yet scored — view
+                and fix
+              </button>
+            ) : (
+              <p className="text-muted-foreground mt-2 text-xs">Every lead is scored</p>
+            )}
           </>
         )}
       </CardContent>

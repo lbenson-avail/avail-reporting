@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ExternalLink } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -154,11 +154,35 @@ const icpCell = (l) =>
     <span className="text-muted-foreground">Unscored</span>
   );
 
-export function LeadLists({ leads }) {
+// Deep link to the lead record in HubSpot (0-136 = Leads object) so reps can
+// fix missing companies, reasons, and ICP scores in one click.
+const leadUrl = (portalId, leadId) =>
+  portalId ? `https://app.hubspot.com/contacts/${portalId}/record/0-136/${leadId}` : null;
+
+function LeadLink({ portalId, lead }) {
+  const url = leadUrl(portalId, lead.id);
+  const label = lead.company || lead.name || 'Unnamed lead';
+  if (!url) return <>{label}</>;
+  return (
+    <a
+      href={url}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="hover:text-primary focus-visible:ring-ring/50 group inline-flex items-center gap-1 rounded-sm underline-offset-4 outline-none hover:underline focus-visible:ring-[3px]"
+      aria-label={`Open ${label} in HubSpot (new tab)`}
+    >
+      {lead.company || <span className="text-muted-foreground group-hover:text-primary">Add company</span>}
+      <ExternalLink aria-hidden="true" className="size-3 opacity-0 transition-opacity group-hover:opacity-60 group-focus-visible:opacity-60" />
+    </a>
+  );
+}
+
+export function LeadLists({ leads, tab, onTabChange }) {
   const d = leads.data;
+  const portalId = d?.portalId;
 
   return (
-    <Card className="gap-3">
+    <Card className="gap-3" id="lead-lists">
       <CardHeader>
         <CardTitle className="text-sm font-medium">Lead Lists</CardTitle>
       </CardHeader>
@@ -168,7 +192,7 @@ export function LeadLists({ leads }) {
         ) : leads.error ? (
           <LeadsError error={leads.error} />
         ) : (
-          <Tabs defaultValue="qualified">
+          <Tabs value={tab} onValueChange={onTabChange}>
             <TabsList>
               <TabsTrigger value="qualified">
                 Qualified ({fmtNum(d.listCaps.qualified.total)})
@@ -190,7 +214,11 @@ export function LeadLists({ leads }) {
                 emptyText="No qualified leads in this period"
                 capNote={<CapNote cap={d.listCaps.qualified} />}
                 columns={[
-                  { header: 'Company', render: (l) => l.company || '—', cellClass: 'font-medium' },
+                  {
+                    header: 'Company',
+                    render: (l) => <LeadLink portalId={portalId} lead={l} />,
+                    cellClass: 'font-medium',
+                  },
                   { header: 'Lead', render: (l) => l.name || '—' },
                   { header: 'ICP Fit', render: icpCell },
                   { header: 'Rep', render: (l) => ownerShort(l.ownerId) },
@@ -213,7 +241,11 @@ export function LeadLists({ leads }) {
                 emptyText="No disqualified leads in this period"
                 capNote={<CapNote cap={d.listCaps.disqualified} />}
                 columns={[
-                  { header: 'Company', render: (l) => l.company || '—', cellClass: 'font-medium' },
+                  {
+                    header: 'Company',
+                    render: (l) => <LeadLink portalId={portalId} lead={l} />,
+                    cellClass: 'font-medium',
+                  },
                   { header: 'Lead', render: (l) => l.name || '—' },
                   {
                     header: 'Reason',
@@ -236,7 +268,11 @@ export function LeadLists({ leads }) {
                 emptyText="Every lead in this period has an ICP score"
                 capNote={<CapNote cap={d.listCaps.unscored} />}
                 columns={[
-                  { header: 'Company', render: (l) => l.company || '—', cellClass: 'font-medium' },
+                  {
+                    header: 'Company',
+                    render: (l) => <LeadLink portalId={portalId} lead={l} />,
+                    cellClass: 'font-medium',
+                  },
                   { header: 'Lead', render: (l) => l.name || '—' },
                   {
                     header: 'Current Stage',

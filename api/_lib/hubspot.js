@@ -181,6 +181,24 @@ export async function getLeadDateEnteredProps() {
   return leadEnteredPropsCache;
 }
 
+// HubSpot portal id — needed to build record deep-links. Cached per instance.
+let portalIdCache;
+let portalIdCacheAt = 0;
+
+export async function getPortalId() {
+  if (portalIdCache !== undefined && Date.now() - portalIdCacheAt < 60 * 60 * 1000) {
+    return portalIdCache;
+  }
+  try {
+    const info = await hsFetch('/account-info/v3/details');
+    portalIdCache = info?.portalId ?? null;
+  } catch {
+    portalIdCache = null;
+  }
+  portalIdCacheAt = Date.now();
+  return portalIdCache;
+}
+
 // ─── Filter helpers ──────────────────────────────────────────────────────────
 export function ownerFilter(ownerIds) {
   return { propertyName: 'hubspot_owner_id', operator: 'IN', values: ownerIds };

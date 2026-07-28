@@ -10,20 +10,29 @@ import { hsCount, ownerFilter, rangeFilter, HsError } from '../_lib/hubspot.js';
 
 async function compute({ startMs, endMs, ownerIds }) {
   const counts = {};
-  await Promise.all(
-    MEETING_OUTCOMES.map(async (outcome) => {
-      const filters = [
-        { propertyName: 'hs_meeting_outcome', operator: 'EQ', value: outcome },
-        ownerFilter(ownerIds),
-      ];
-      if (startMs != null) filters.push(rangeFilter('hs_meeting_start_time', startMs, endMs));
-      counts[outcome] = await hsCount('meetings', [{ filters }]);
-    })
-  );
+  const countWith = (outcomeFilter) => {
+    const filters = [outcomeFilter, ownerFilter(ownerIds)];
+    if (startMs != null) filters.push(rangeFilter('hs_meeting_start_time', startMs, endMs));
+    return hsCount('meetings', [{ filters }]);
+  };
 
+  const [missingOutcome] = await Promise.all([
+    countWith({ propertyName: 'hs_meeting_outcome', operator: 'NOT_HAS_PROPERTY' }),
+    ...MEETING_OUTCOMES.map(async (outcome) => {
+      counts[outcome] = await countWith({
+        propertyName: 'hs_meeting_outcome',
+        operator: 'EQ',
+        value: outcome,
+      });
+    }),
+  ]);
+
+  // Show rate covers meetings WITH an outcome; missing-outcome meetings are
+  // reported alongside as a data-quality signal, never in the math.
   const booked = MEETING_OUTCOMES.reduce((s, o) => s + counts[o], 0);
   return {
     counts,
+    missingOutcome,
     booked,
     completed: counts.COMPLETED,
     showRate: booked > 0 ? (counts.COMPLETED / booked) * 100 : null,

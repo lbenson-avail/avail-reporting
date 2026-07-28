@@ -24,7 +24,7 @@ const ownerName = (ownerId) => SALES_OWNERS.find((o) => o.id === ownerId)?.name 
 export function RepBreakdownTable({ leads }) {
   const def = METRIC_DEFS.repBreakdown;
   const rows = leads.data?.repBreakdown || [];
-  const stages = leads.data?.stageCounts || [];
+  const columns = leads.data?.repFunnelColumns || [];
 
   return (
     <Card className="gap-3">
@@ -40,49 +40,57 @@ export function RepBreakdownTable({ leads }) {
         ) : leads.error ? (
           <LeadsError error={leads.error} />
         ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Rep</TableHead>
-                <TableHead className="text-right">Leads created</TableHead>
-                <TableHead className="text-right">Share</TableHead>
-                <TableHead className="text-right">SQLs</TableHead>
-                {stages.map((s) => (
-                  <TableHead key={s.id} className="text-right">
-                    {s.label}
-                  </TableHead>
-                ))}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {rows.map((r) => (
-                <TableRow key={r.ownerId}>
-                  <TableCell className="font-medium">
-                    <span className="flex items-center gap-2">
-                      <span
-                        aria-hidden
-                        className="size-2.5 rounded-full"
-                        style={{ background: repColor(r.ownerId) }}
-                      />
-                      {ownerName(r.ownerId)}
-                    </span>
-                  </TableCell>
-                  <TableCell className="text-right font-medium tabular-nums">
-                    {fmtNum(r.created)}
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums">{fmtPct(r.share, 0)}</TableCell>
-                  <TableCell className="text-right tabular-nums">
-                    {r.sqls == null ? '—' : fmtNum(r.sqls)}
-                  </TableCell>
-                  {r.stageCounts.map((s) => (
-                    <TableCell key={s.id} className="text-right tabular-nums">
-                      {fmtNum(s.count)}
-                    </TableCell>
+          <>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Rep</TableHead>
+                  <TableHead className="text-right">Leads created</TableHead>
+                  <TableHead className="text-right">Share</TableHead>
+                  {columns.map((c) => (
+                    <TableHead key={c.role} className="text-right">
+                      {c.label}
+                    </TableHead>
                   ))}
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {rows.map((r) => {
+                  const byRole = new Map((r.funnel || []).map((f) => [f.role, f.count]));
+                  return (
+                    <TableRow key={r.ownerId}>
+                      <TableCell className="font-medium">
+                        <span className="flex items-center gap-2">
+                          <span
+                            aria-hidden="true"
+                            className="size-2.5 rounded-full"
+                            style={{ background: repColor(r.ownerId) }}
+                          />
+                          {ownerName(r.ownerId)}
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-right font-medium tabular-nums">
+                        {fmtNum(r.created)}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums">
+                        {fmtPct(r.share)}
+                      </TableCell>
+                      {columns.map((c) => (
+                        <TableCell key={c.role} className="text-right tabular-nums">
+                          {fmtNum(byRole.get(c.role) ?? 0)}
+                        </TableCell>
+                      ))}
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+            <p className="text-muted-foreground mt-2 text-xs">
+              Stage columns count leads that have <em>ever reached</em> that stage in their
+              journey — not where they sit today — so the row reads as a funnel and Qualified
+              matches the SQL count.
+            </p>
+          </>
         )}
       </CardContent>
     </Card>

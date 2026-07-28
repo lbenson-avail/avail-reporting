@@ -17,7 +17,7 @@ const OUTCOME_LABELS = {
 export function MeetingShowRateCard({ meetings }) {
   const def = METRIC_DEFS.meetingShowRate;
   const d = meetings.data;
-  const max = Math.max(1, ...MEETING_OUTCOMES.map((o) => d?.counts?.[o] ?? 0));
+  const max = Math.max(1, d?.missingOutcome ?? 0, ...MEETING_OUTCOMES.map((o) => d?.counts?.[o] ?? 0));
 
   return (
     <Card className="gap-3">
@@ -47,6 +47,20 @@ export function MeetingShowRateCard({ meetings }) {
             {MEETING_OUTCOMES.map((o) => (
               <BarRow key={o} label={OUTCOME_LABELS[o]} value={d.counts?.[o] ?? 0} max={max} />
             ))}
+            {(d.missingOutcome ?? 0) > 0 && (
+              <>
+                <BarRow
+                  label="Missing outcome"
+                  value={d.missingOutcome}
+                  max={max}
+                  color="var(--viz-warning)"
+                />
+                <p className="text-muted-foreground mt-1 text-xs">
+                  Missing-outcome meetings aren’t counted in the show rate — set their outcome in
+                  HubSpot to include them.
+                </p>
+              </>
+            )}
           </>
         )}
       </CardContent>

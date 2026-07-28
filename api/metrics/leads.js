@@ -3,7 +3,14 @@
 // reaching-out → connected time, rep-vs-rep breakdown, qualified /
 // disqualified lists — from the HubSpot Leads object, scoped to sales owners.
 
-import { PROPS, dateEnteredProp, ICP_CATEGORIES, FETCH_CAPS } from '../../lib/config.js';
+import {
+  PROPS,
+  dateEnteredProp,
+  ICP_CATEGORIES,
+  FETCH_CAPS,
+  LEAD_STAGE_HIDE_MATCHER,
+  REP_FUNNEL,
+} from '../../lib/config.js';
 import { requireAuth } from '../_lib/auth.js';
 import { parseParams } from '../_lib/params.js';
 import { cached } from '../_lib/cache.js';
@@ -12,6 +19,7 @@ import {
   hsSearchAll,
   getLeadStages,
   getLeadDateEnteredProps,
+  getPortalId,
   ownerFilter,
   rangeFilter,
   avgDays,
@@ -155,12 +163,15 @@ async function compute({ startMs, endMs, ownerIds }) {
     sorts: [{ propertyName: PROPS.leadCreateDate, direction: 'DESCENDING' }],
   });
 
-  // Leads by current stage (in pipeline display order).
-  const stageCounts = stages.map((s) => ({
-    id: s.id,
-    label: s.label,
-    count: results.filter((l) => l.properties?.hs_pipeline_stage === s.id).length,
-  }));
+  // Leads by current stage (in pipeline display order), minus hidden stages.
+  const hideRe = new RegExp(LEAD_STAGE_HIDE_MATCHER, 'i');
+  const stageCounts = stages
+    .filter((s) => !hideRe.test(s.label))
+    .map((s) => ({
+      id: s.id,
+      label: s.label,
+      count: results.filter((l) => l.properties?.hs_pipeline_stage === s.id).length,
+    }));
 
   // SQLs — has EVER entered the Qualified Buyer stage.
   const qualifiedLeads = roles.qualified ? results.filter((l) => enteredAt(l, 'qualified')) : [];
@@ -210,7 +221,9 @@ async function compute({ startMs, endMs, ownerIds }) {
   }));
   const icpUnscored = results.filter((l) => !l.properties?.[PROPS.leadIcpFit]).length;
 
-  // Rep vs rep.
+  // Rep vs rep — funnel counts: leads that have EVER entered each stage,
+  // so the columns read left-to-right as a funnel even as leads keep moving.
+  const funnelColumns = REP_FUNNEL.filter((f) => roles[f.role]);
   const repBreakdown = ownerIds.map((ownerId) => {
     const mine = results.filter((l) => l.properties?.hubspot_owner_id === ownerId);
     return {
@@ -218,9 +231,9 @@ async function compute({ startMs, endMs, ownerIds }) {
       created: mine.length,
       share: results.length > 0 ? (mine.length / results.length) * 100 : 0,
       sqls: roles.qualified ? mine.filter((l) => enteredAt(l, 'qualified')).length : null,
-      stageCounts: stages.map((s) => ({
-        id: s.id,
-        count: mine.filter((l) => l.properties?.hs_pipeline_stage === s.id).length,
+      funnel: funnelColumns.map((f) => ({
+        role: f.role,
+        count: mine.filter((l) => enteredAt(l, f.role)).length,
       })),
     };
   });
@@ -234,12 +247,23 @@ async function compute({ startMs, endMs, ownerIds }) {
   const disqualifiedRows = disqualifiedLeads.slice(0, FETCH_CAPS.listRows);
   const unscoredRows = unscoredLeads.slice(0, FETCH_CAPS.listRows);
 
-  const companyNames = await resolveCompanies([
-    ...new Set([...qualifiedRows, ...disqualifiedRows, ...unscoredRows].map((l) => String(l.id))),
+  const [companyNames, portalId] = await Promise.all([
+    resolveCompanies([
+      ...new Set(
+        [...qualifiedRows, ...disqualifiedRows, ...unscoredRows].map((l) => String(l.id))
+      ),
+    ]),
+    getPortalId(),
   ]);
 
   return {
     totalCreated: total,
+    portalId,
+    repFunnelColumns: funnelColumns.map((f) => ({
+      role: f.role,
+      label: f.label,
+      stageLabel: stageLabel.get(roles[f.role]) || f.label,
+    })),
     stageCounts,
     roles: Object.fromEntries(
       Object.entries(roles).map(([k, id]) => [k, id ? { id, label: stageLabel.get(id) } : null])
