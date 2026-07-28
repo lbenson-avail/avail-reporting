@@ -42,10 +42,15 @@ export function DateRangePicker({ range, onChange }) {
   // in a tab left open across days.
   const presets = buildPresets();
 
-  const display =
-    range.key === 'custom'
-      ? `${format(new Date(`${range.start}T00:00:00`), 'MMM d, yyyy')} – ${format(new Date(`${range.end}T00:00:00`), 'MMM d, yyyy')}`
-      : range.label;
+  // Always show the resolved dates, so picking a preset that happens to cover
+  // the same window (e.g. Quarter to date in the quarter's first month) still
+  // gives visible confirmation of what's selected.
+  const fmtDay = (s) => format(new Date(`${s}T00:00:00`), 'MMM d');
+  const display = !range.start
+    ? range.label
+    : range.key === 'custom'
+      ? `${fmtDay(range.start)} – ${fmtDay(range.end)}`
+      : `${range.label} · ${fmtDay(range.start)} – ${fmtDay(range.end)}`;
 
   const commit = (from, to) => {
     onChange({ key: 'custom', label: 'Custom', start: toParam(from), end: toParam(to) });
