@@ -125,31 +125,22 @@ export function DealStageChart({ deals, previousDeals }) {
                   tick={{ fill: 'var(--muted-foreground)', fontSize: 12 }}
                 />
                 <RechartsTooltip content={<StageTooltip />} cursor={{ fill: 'var(--muted)' }} />
-                {SALES_OWNERS.map((o, i) => {
-                  const isTop = i === SALES_OWNERS.length - 1;
-                  return (
-                    <Bar
-                      key={o.id}
+                {SALES_OWNERS.map((o, i) => (
+                  <Bar
+                    key={o.id}
+                    dataKey={`rep${i}`}
+                    fill={REP_COLORS[i]}
+                    maxBarSize={28}
+                    radius={[4, 4, 0, 0]}
+                  >
+                    <LabelList
                       dataKey={`rep${i}`}
-                      stackId="reps"
-                      fill={REP_COLORS[i]}
-                      maxBarSize={48}
-                      radius={isTop ? [4, 4, 0, 0] : 0}
-                      // 2px surface gap between stacked segments
-                      stroke="var(--card)"
-                      strokeWidth={i > 0 ? 1 : 0}
-                    >
-                      {isTop && (
-                        <LabelList
-                          dataKey="count"
-                          position="top"
-                          className="fill-foreground"
-                          fontSize={12}
-                        />
-                      )}
-                    </Bar>
-                  );
-                })}
+                      position="top"
+                      className="fill-foreground"
+                      fontSize={11}
+                    />
+                  </Bar>
+                ))}
               </BarChart>
             </ResponsiveContainer>
             </div>

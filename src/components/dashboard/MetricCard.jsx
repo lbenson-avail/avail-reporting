@@ -8,15 +8,15 @@ import { cn } from '@/lib/utils';
 // hover when `exact` is provided), optional trend chip and sub line.
 export function MetricCard({ def, value, exact, trend, sub, loading, error, accentClass, children }) {
   return (
-    <Card className="gap-0 py-4">
-      <CardContent className="px-4">
+    <Card className="gap-0 py-5">
+      <CardContent className="px-5">
         <div className="flex items-center gap-1.5">
           <span className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
             {def.title}
           </span>
           <InfoTip text={def.tooltip} />
         </div>
-        <div className="mt-2">
+        <div className="mt-3">
           {loading ? (
             <Skeleton className="h-8 w-24" />
           ) : error ? (

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { ChevronLeft, ChevronRight, ExternalLink } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Select,
@@ -20,21 +20,14 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { METRIC_DEFS, SALES_OWNERS, LIST_PAGE_SIZES } from '../../../lib/config.js';
 import { fmtDate, fmtNum } from '@/lib/format';
-import { InfoTip } from './InfoTip';
+import { ICP_COLORS, UNSCORED_COLOR, icpPillStyle } from '@/lib/icpColors';
 import { LeadsError } from './LeadsError';
 
 const ownerShort = (ownerId) => SALES_OWNERS.find((o) => o.id === ownerId)?.shortName || '—';
 
-// Fit pills: green / yellow / red, grey for unscored — label always present,
-// so color reinforces rather than carries the meaning.
-const ICP_BADGE_CLASS = {
-  'Strong Fit': 'border-transparent bg-green-100 text-green-900 dark:bg-green-950 dark:text-green-200',
-  'Moderate Fit': 'border-transparent bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-200',
-  'Weak Fit': 'border-transparent bg-red-100 text-red-900 dark:bg-red-950 dark:text-red-200',
-  'Not a Fit': 'border-transparent bg-red-200 text-red-950 dark:bg-red-900 dark:text-red-100',
-};
 
 // Client-side paginated table shared by the three lead lists.
 function PaginatedTable({ rows, columns, emptyText, capNote }) {
@@ -149,9 +142,14 @@ function CapNote({ cap }) {
   );
 }
 
+// Pills wear the exact same tokens as the ICP Fit Ratings bars.
 const icpCell = (l) =>
   l.icpFit ? (
-    <Badge variant="outline" className={ICP_BADGE_CLASS[l.icpFit]}>
+    <Badge
+      variant="outline"
+      className="border-transparent font-medium"
+      style={icpPillStyle(ICP_COLORS[l.icpFit] || UNSCORED_COLOR)}
+    >
       {l.icpFit}
     </Badge>
   ) : (
@@ -159,6 +157,31 @@ const icpCell = (l) =>
       Unscored
     </Badge>
   );
+
+// Disqualification reason with the rep's typed notes on hover.
+function ReasonCell({ reason, notes }) {
+  if (!reason && !notes) {
+    return <span className="text-muted-foreground">No reason entered</span>;
+  }
+  const label = reason || 'See notes';
+  if (!notes && (reason?.length ?? 0) <= 40) return <>{label}</>;
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span
+          tabIndex={0}
+          className="cursor-help underline decoration-dotted decoration-muted-foreground/50 underline-offset-4 outline-none focus-visible:ring-ring/50 focus-visible:ring-[3px] rounded-sm"
+        >
+          {label}
+        </span>
+      </TooltipTrigger>
+      <TooltipContent className="max-w-72">
+        {reason && <p className="font-medium">{reason}</p>}
+        {notes && <p className={reason ? 'mt-1' : ''}>{notes}</p>}
+      </TooltipContent>
+    </Tooltip>
+  );
+}
 
 // Deep link to the lead record in HubSpot (0-136 = Leads object) so reps can
 // fix missing companies, reasons, and ICP scores in one click.
@@ -187,10 +210,17 @@ export function LeadLists({ leads, tab, onTabChange }) {
   const d = leads.data;
   const portalId = d?.portalId;
 
+  const activeDef = {
+    qualified: METRIC_DEFS.qualifiedList,
+    disqualified: METRIC_DEFS.disqualifiedList,
+    unscored: METRIC_DEFS.unscoredList,
+  }[tab];
+
   return (
     <Card className="gap-3" id="lead-lists">
       <CardHeader>
         <CardTitle className="text-sm font-medium">Lead Lists</CardTitle>
+        {activeDef && <CardDescription className="text-xs">{activeDef.tooltip}</CardDescription>}
       </CardHeader>
       <CardContent>
         {leads.loading ? (
@@ -212,9 +242,6 @@ export function LeadLists({ leads, tab, onTabChange }) {
             </TabsList>
 
             <TabsContent value="qualified">
-              <div className="text-muted-foreground mb-2 flex items-center gap-1 text-xs">
-                {METRIC_DEFS.qualifiedList.tooltip}
-              </div>
               <PaginatedTable
                 rows={d.qualifiedList}
                 emptyText="No qualified leads in this period"
@@ -239,9 +266,6 @@ export function LeadLists({ leads, tab, onTabChange }) {
             </TabsContent>
 
             <TabsContent value="disqualified">
-              <div className="text-muted-foreground mb-2 flex items-center gap-1 text-xs">
-                {METRIC_DEFS.disqualifiedList.tooltip}
-              </div>
               <PaginatedTable
                 rows={d.disqualifiedList}
                 emptyText="No disqualified leads in this period"
@@ -256,8 +280,7 @@ export function LeadLists({ leads, tab, onTabChange }) {
                   {
                     header: 'Reason',
                     cellClass: 'max-w-72 truncate',
-                    render: (l) =>
-                      l.reason || <span className="text-muted-foreground">No reason entered</span>,
+                    render: (l) => <ReasonCell reason={l.reason} notes={l.notes} />,
                   },
                   { header: 'Rep', render: (l) => ownerShort(l.ownerId) },
                 ]}
@@ -265,10 +288,6 @@ export function LeadLists({ leads, tab, onTabChange }) {
             </TabsContent>
 
             <TabsContent value="unscored">
-              <div className="text-muted-foreground mb-2 flex items-center gap-1 text-xs">
-                {METRIC_DEFS.unscoredList.tooltip}
-                <InfoTip text={METRIC_DEFS.unscoredList.tooltip} />
-              </div>
               <PaginatedTable
                 rows={d.unscoredList || []}
                 emptyText="Every lead in this period has an ICP score"

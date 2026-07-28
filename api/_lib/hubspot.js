@@ -159,26 +159,25 @@ export async function getLeadStages() {
   return leadStageCache;
 }
 
-// All lead property names containing "date_entered" — the portal's real
-// stage-entry timestamp properties, whatever naming scheme it uses. Cached per
-// instance; null when the token lacks schema read (callers degrade to guesses).
-let leadEnteredPropsCache;
-let leadEnteredPropsCacheAt = 0;
+// Every lead property name the portal has — ground truth for resolving
+// stage-entry timestamps and disqualification note fields, whatever naming
+// scheme the portal uses. Cached per instance; null when the token lacks
+// schema read (callers degrade to guesses).
+let leadPropNamesCache;
+let leadPropNamesCacheAt = 0;
 
-export async function getLeadDateEnteredProps() {
-  if (leadEnteredPropsCache !== undefined && Date.now() - leadEnteredPropsCacheAt < 10 * 60 * 1000) {
-    return leadEnteredPropsCache;
+export async function getLeadPropertyNames() {
+  if (leadPropNamesCache !== undefined && Date.now() - leadPropNamesCacheAt < 10 * 60 * 1000) {
+    return leadPropNamesCache;
   }
   try {
     const data = await hsFetch('/crm/v3/properties/leads');
-    leadEnteredPropsCache = (data.results || [])
-      .map((p) => p.name)
-      .filter((n) => n.includes('date_entered'));
+    leadPropNamesCache = (data.results || []).map((p) => p.name);
   } catch {
-    leadEnteredPropsCache = null;
+    leadPropNamesCache = null;
   }
-  leadEnteredPropsCacheAt = Date.now();
-  return leadEnteredPropsCache;
+  leadPropNamesCacheAt = Date.now();
+  return leadPropNamesCache;
 }
 
 // HubSpot portal id — needed to build record deep-links. Cached per instance.

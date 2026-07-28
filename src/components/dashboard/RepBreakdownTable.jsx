@@ -1,4 +1,4 @@
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Table,
@@ -27,6 +27,10 @@ export function RepBreakdownTable({ leads }) {
           {def.title}
           <InfoTip text={def.tooltip} />
         </CardTitle>
+        <CardDescription className="text-xs">
+          Stage columns count leads that have <em>ever reached</em> that stage — not where they
+          sit today — so the row reads as a funnel and Qualified matches the SQL count.
+        </CardDescription>
       </CardHeader>
       <CardContent>
         {leads.loading ? (
@@ -41,8 +45,11 @@ export function RepBreakdownTable({ leads }) {
                   <TableHead>Rep</TableHead>
                   <TableHead className="text-right">Leads created</TableHead>
                   <TableHead className="text-right">Share</TableHead>
-                  {columns.map((c) => (
-                    <TableHead key={c.role} className="text-right">
+                  {columns.map((c, i) => (
+                    <TableHead
+                      key={c.role}
+                      className={`text-right ${i === 0 ? 'border-l pl-6' : ''}`}
+                    >
                       {c.label}
                     </TableHead>
                   ))}
@@ -69,8 +76,11 @@ export function RepBreakdownTable({ leads }) {
                       <TableCell className="text-right tabular-nums">
                         {fmtPct(r.share)}
                       </TableCell>
-                      {columns.map((c) => (
-                        <TableCell key={c.role} className="text-right tabular-nums">
+                      {columns.map((c, i) => (
+                        <TableCell
+                          key={c.role}
+                          className={`text-right tabular-nums ${i === 0 ? 'border-l pl-6' : ''}`}
+                        >
                           {fmtNum(byRole.get(c.role) ?? 0)}
                         </TableCell>
                       ))}
@@ -79,11 +89,6 @@ export function RepBreakdownTable({ leads }) {
                 })}
               </TableBody>
             </Table>
-            <p className="text-muted-foreground mt-2 text-xs">
-              Stage columns count leads that have <em>ever reached</em> that stage in their
-              journey — not where they sit today — so the row reads as a funnel and Qualified
-              matches the SQL count.
-            </p>
           </>
         )}
       </CardContent>

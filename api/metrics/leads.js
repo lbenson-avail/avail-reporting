@@ -18,7 +18,7 @@ import {
   hsFetch,
   hsSearchAll,
   getLeadStages,
-  getLeadDateEnteredProps,
+  getLeadPropertyNames,
   getPortalId,
   ownerFilter,
   rangeFilter,
@@ -108,7 +108,22 @@ async function compute({ startMs, endMs, ownerIds }) {
   // property list when readable, and read whichever candidate is populated.
   const legacyEnteredProp = (stageId) => `hs_date_entered_${stageId}`;
   const norm = (id) => String(id).toLowerCase().replace(/[^a-z0-9]+/g, '_');
-  const portalEnteredProps = await getLeadDateEnteredProps();
+  const portalProps = await getLeadPropertyNames();
+  const portalEnteredProps = portalProps
+    ? portalProps.filter((n) => n.includes('date_entered'))
+    : null;
+
+  // The rep's free-text disqualification input lives in portal-specific
+  // properties (notes/details variants) alongside the configured reason —
+  // request every non-timestamp property mentioning "disqualif".
+  const disqualifyNoteProps = (portalProps || []).filter(
+    (n) =>
+      /disqualif/i.test(n) &&
+      !n.includes('date_entered') &&
+      !n.includes('date_exited') &&
+      !n.includes('time_in') &&
+      n !== PROPS.leadDisqualifyReason
+  );
 
   const roleEnteredProps = {};
   for (const [role, id] of Object.entries(roles)) {
@@ -158,6 +173,7 @@ async function compute({ startMs, endMs, ownerIds }) {
       PROPS.leadName,
       PROPS.leadIcpFit,
       PROPS.leadDisqualifyReason,
+      ...disqualifyNoteProps,
       ...roleProps,
     ],
     sorts: [{ propertyName: PROPS.leadCreateDate, direction: 'DESCENDING' }],
@@ -301,6 +317,12 @@ async function compute({ startMs, endMs, ownerIds }) {
       name: l.properties?.[PROPS.leadName] || null,
       company: companyNames.get(String(l.id)),
       reason: l.properties?.[PROPS.leadDisqualifyReason] || null,
+      // The rep's typed explanation, from whichever notes-style property holds it.
+      notes:
+        disqualifyNoteProps
+          .map((p) => l.properties?.[p])
+          .filter((v) => v && String(v).trim())
+          .join(' · ') || null,
       ownerId: l.properties?.hubspot_owner_id,
     })),
     unscoredList: unscoredRows.map((l) => ({

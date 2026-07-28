@@ -59,18 +59,12 @@ export function MeetingShowRateCard({ meetings, previousMeetings }) {
               <BarRow key={o} label={OUTCOME_LABELS[o]} value={d.counts?.[o] ?? 0} max={max} />
             ))}
             {(d.missingOutcome ?? 0) > 0 && (
-              <>
-                <BarRow
-                  label="Missing outcome"
-                  value={d.missingOutcome}
-                  max={max}
-                  color="var(--viz-warning)"
-                />
-                <p className="text-muted-foreground mt-1 text-xs">
-                  Missing-outcome meetings aren’t counted in the show rate — set their outcome in
-                  HubSpot to include them.
-                </p>
-              </>
+              <BarRow
+                label="Missing outcome"
+                value={d.missingOutcome}
+                max={max}
+                color="var(--viz-missing)"
+              />
             )}
           </>
         )}
