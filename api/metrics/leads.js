@@ -11,6 +11,7 @@ import {
   hsFetch,
   hsSearchAll,
   getLeadStages,
+  getLeadDateEnteredProps,
   ownerFilter,
   rangeFilter,
   avgDays,
@@ -92,18 +93,43 @@ async function compute({ startMs, endMs, ownerIds }) {
   const { stages, roles } = await getLeadStages();
   const stageLabel = new Map(stages.map((s) => [s.id, s.label]));
 
-  // Stage-entry timestamps: portals expose these under `hs_v2_date_entered_<id>`
-  // and/or the legacy `hs_date_entered_<id>` naming, and which stages carry
-  // which varies. Request both and read whichever is populated.
+  // Stage-entry timestamps. Naming varies: `hs_v2_date_entered_<id>` and/or
+  // legacy `hs_date_entered_<id>`, and built-in lead stages have hyphenated
+  // IDs ("attempting-stage-id") that get normalized to underscores in the
+  // property name. Resolve each role's candidates against the portal's real
+  // property list when readable, and read whichever candidate is populated.
   const legacyEnteredProp = (stageId) => `hs_date_entered_${stageId}`;
-  const roleIds = Object.values(roles).filter(Boolean);
-  const roleProps = roleIds.flatMap((id) => [dateEnteredProp(id), legacyEnteredProp(id)]);
-  const enteredAt = (lead, stageId) =>
-    stageId
-      ? lead.properties?.[dateEnteredProp(stageId)] ||
-        lead.properties?.[legacyEnteredProp(stageId)] ||
-        null
-      : null;
+  const norm = (id) => String(id).toLowerCase().replace(/[^a-z0-9]+/g, '_');
+  const portalEnteredProps = await getLeadDateEnteredProps();
+
+  const roleEnteredProps = {};
+  for (const [role, id] of Object.entries(roles)) {
+    if (!id) {
+      roleEnteredProps[role] = [];
+      continue;
+    }
+    const candidates = new Set([
+      dateEnteredProp(id),
+      legacyEnteredProp(id),
+      `hs_v2_date_entered_${norm(id)}`,
+      `hs_date_entered_${norm(id)}`,
+    ]);
+    for (const p of portalEnteredProps || []) {
+      if (p.endsWith(norm(id)) || p.endsWith(String(id))) candidates.add(p);
+    }
+    // Prefer v2 properties (sort puts hs_v2_* after hs_date_* — iterate v2 first).
+    roleEnteredProps[role] = [...candidates].sort((a, b) =>
+      a.startsWith('hs_v2') === b.startsWith('hs_v2') ? 0 : a.startsWith('hs_v2') ? -1 : 1
+    );
+  }
+  const roleProps = Object.values(roleEnteredProps).flat();
+  const enteredAt = (lead, role) => {
+    for (const p of roleEnteredProps[role] || []) {
+      const v = lead.properties?.[p];
+      if (v) return v;
+    }
+    return null;
+  };
 
   const filters = [ownerFilter(ownerIds)];
   if (startMs != null) filters.push(rangeFilter(PROPS.leadCreateDate, startMs, endMs));
@@ -130,24 +156,20 @@ async function compute({ startMs, endMs, ownerIds }) {
   }));
 
   // SQLs — has EVER entered the Qualified Buyer stage.
-  const qualifiedLeads = roles.qualified
-    ? results.filter((l) => enteredAt(l, roles.qualified))
-    : [];
+  const qualifiedLeads = roles.qualified ? results.filter((l) => enteredAt(l, 'qualified')) : [];
 
   // Timing metrics.
   const speedToLead = roles.reachingOut
     ? avgDays(
-        results.map((l) => [l.properties?.[PROPS.leadCreateDate], enteredAt(l, roles.reachingOut)])
+        results.map((l) => [l.properties?.[PROPS.leadCreateDate], enteredAt(l, 'reachingOut')])
       )
     : { days: null, n: 0 };
   const reachingToConnected =
     roles.reachingOut && roles.connected
-      ? avgDays(
-          results.map((l) => [enteredAt(l, roles.reachingOut), enteredAt(l, roles.connected)])
-        )
+      ? avgDays(results.map((l) => [enteredAt(l, 'reachingOut'), enteredAt(l, 'connected')]))
       : { days: null, n: 0 };
 
-  // Per-role visibility into which timestamp naming this portal populates —
+  // Per-role visibility into which timestamp property this portal populates —
   // makes an empty timing metric diagnosable from the API response.
   const timingDiagnostics = Object.fromEntries(
     Object.entries(roles).map(([role, id]) => [
@@ -155,8 +177,12 @@ async function compute({ startMs, endMs, ownerIds }) {
       id
         ? {
             stageId: id,
-            v2: results.filter((l) => l.properties?.[dateEnteredProp(id)]).length,
-            legacy: results.filter((l) => l.properties?.[legacyEnteredProp(id)]).length,
+            counts: Object.fromEntries(
+              roleEnteredProps[role].map((p) => [
+                p,
+                results.filter((l) => l.properties?.[p]).length,
+              ])
+            ),
           }
         : null,
     ])
@@ -176,7 +202,7 @@ async function compute({ startMs, endMs, ownerIds }) {
       ownerId,
       created: mine.length,
       share: results.length > 0 ? (mine.length / results.length) * 100 : 0,
-      sqls: roles.qualified ? mine.filter((l) => enteredAt(l, roles.qualified)).length : null,
+      sqls: roles.qualified ? mine.filter((l) => enteredAt(l, 'qualified')).length : null,
       stageCounts: stages.map((s) => ({
         id: s.id,
         count: mine.filter((l) => l.properties?.hs_pipeline_stage === s.id).length,
@@ -214,7 +240,7 @@ async function compute({ startMs, endMs, ownerIds }) {
       name: l.properties?.[PROPS.leadName] || null,
       company: companyNames.get(String(l.id)),
       icpFit: l.properties?.[PROPS.leadIcpFit] || null,
-      qualifiedAt: enteredAt(l, roles.qualified),
+      qualifiedAt: enteredAt(l, 'qualified'),
       ownerId: l.properties?.hubspot_owner_id,
     })),
     disqualifiedList: disqualifiedRows.map((l) => ({

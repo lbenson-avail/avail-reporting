@@ -159,6 +159,28 @@ export async function getLeadStages() {
   return leadStageCache;
 }
 
+// All lead property names containing "date_entered" — the portal's real
+// stage-entry timestamp properties, whatever naming scheme it uses. Cached per
+// instance; null when the token lacks schema read (callers degrade to guesses).
+let leadEnteredPropsCache;
+let leadEnteredPropsCacheAt = 0;
+
+export async function getLeadDateEnteredProps() {
+  if (leadEnteredPropsCache !== undefined && Date.now() - leadEnteredPropsCacheAt < 10 * 60 * 1000) {
+    return leadEnteredPropsCache;
+  }
+  try {
+    const data = await hsFetch('/crm/v3/properties/leads');
+    leadEnteredPropsCache = (data.results || [])
+      .map((p) => p.name)
+      .filter((n) => n.includes('date_entered'));
+  } catch {
+    leadEnteredPropsCache = null;
+  }
+  leadEnteredPropsCacheAt = Date.now();
+  return leadEnteredPropsCache;
+}
+
 // ─── Filter helpers ──────────────────────────────────────────────────────────
 export function ownerFilter(ownerIds) {
   return { propertyName: 'hubspot_owner_id', operator: 'IN', values: ownerIds };
