@@ -114,8 +114,15 @@ async function compute({ startMs, endMs, ownerIds }) {
       `hs_v2_date_entered_${norm(id)}`,
       `hs_date_entered_${norm(id)}`,
     ]);
+    // Portal properties normalize hyphenated stage IDs and append a numeric
+    // suffix (hs_v2_date_entered_attempting_stage_id_745667965), so match on
+    // containment, not suffix. Legacy hs_date_entered_* variants aren't listed
+    // in the schema but still return data — derive them from each v2 match.
     for (const p of portalEnteredProps || []) {
-      if (p.endsWith(norm(id)) || p.endsWith(String(id))) candidates.add(p);
+      if (p.includes(`date_entered_${norm(id)}`) || p.includes(`date_entered_${id}`)) {
+        candidates.add(p);
+        if (p.startsWith('hs_v2_')) candidates.add(p.replace('hs_v2_', 'hs_'));
+      }
     }
     // Prefer v2 properties (sort puts hs_v2_* after hs_date_* — iterate v2 first).
     roleEnteredProps[role] = [...candidates].sort((a, b) =>
