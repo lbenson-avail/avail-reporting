@@ -1,10 +1,12 @@
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { InfoTip } from './InfoTip';
+import { ExactValue } from './ExactValue';
 import { cn } from '@/lib/utils';
 
-// Generic KPI card: label + tooltip, one hero figure, an optional sub line.
-export function MetricCard({ def, value, sub, loading, error, accentClass, children }) {
+// Generic KPI card: label + tooltip, one hero figure (rounded, exact on
+// hover when `exact` is provided), an optional sub line.
+export function MetricCard({ def, value, exact, sub, loading, error, accentClass, children }) {
   return (
     <Card className="gap-0 py-4">
       <CardContent className="px-4">
@@ -22,9 +24,11 @@ export function MetricCard({ def, value, sub, loading, error, accentClass, child
               Unavailable
             </span>
           ) : (
-            <span className={cn('text-2xl font-semibold tracking-tight', accentClass)}>
-              {value}
-            </span>
+            <ExactValue
+              display={value}
+              exact={exact}
+              className={cn('text-2xl font-semibold tracking-tight tabular-nums', accentClass)}
+            />
           )}
         </div>
         {!loading && !error && sub && (

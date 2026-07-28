@@ -1,8 +1,9 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { METRIC_DEFS, MEETING_OUTCOMES } from '../../../lib/config.js';
-import { fmtNum, fmtPct } from '@/lib/format';
+import { fmtNum, fmtPct, fmtPctExact } from '@/lib/format';
 import { BarRow } from './BarRow';
+import { ExactValue } from './ExactValue';
 import { InfoTip } from './InfoTip';
 
 const OUTCOME_LABELS = {
@@ -34,9 +35,11 @@ export function MeetingShowRateCard({ meetings }) {
         ) : (
           <>
             <div className="mb-3 flex items-baseline gap-2">
-              <span className="text-2xl font-semibold tracking-tight">
-                {fmtPct(d.showRate, 0)}
-              </span>
+              <ExactValue
+                display={fmtPct(d.showRate)}
+                exact={fmtPctExact(d.showRate)}
+                className="text-2xl font-semibold tracking-tight tabular-nums"
+              />
               <span className="text-muted-foreground text-xs">
                 {fmtNum(d.completed)} of {fmtNum(d.booked)} meetings completed
               </span>

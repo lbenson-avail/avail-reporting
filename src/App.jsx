@@ -14,7 +14,15 @@ import { RepBreakdownTable } from '@/components/dashboard/RepBreakdownTable';
 import { LeadLists } from '@/components/dashboard/LeadLists';
 import { buildPresets, presetToRange } from '@/components/dashboard/DateRangePicker';
 import { METRIC_DEFS } from '../lib/config.js';
-import { fmtDays, fmtNum, fmtPct } from '@/lib/format';
+import { fmtDays, fmtDaysExact, fmtNum, fmtPct, fmtPctExact } from '@/lib/format';
+
+function SectionHeading({ children }) {
+  return (
+    <h2 className="text-foreground mt-2 text-base font-semibold tracking-tight first:mt-0">
+      {children}
+    </h2>
+  );
+}
 
 function Dashboard() {
   const [range, setRange] = useState(() => presetToRange(buildPresets()[0])); // This month
@@ -27,16 +35,21 @@ function Dashboard() {
   });
 
   const leadErr = leads.error ? String(leads.error.message) : null;
-  const dealErr = deals.error ? String(deals.error.message) : null;
-  const meetErr = meetings.error ? String(meetings.error.message) : null;
 
   const truncated = Boolean(leads.data?.truncated || deals.data?.truncated);
 
-  const kpis = useMemo(() => {
+  const leadKpis = useMemo(() => {
     const l = leads.data;
-    const d = deals.data;
-    const m = meetings.data;
+    const qualifiedPct =
+      l && l.totalCreated > 0 && l.sqls?.count != null
+        ? (l.sqls.count / l.totalCreated) * 100
+        : null;
     return [
+      {
+        def: METRIC_DEFS.totalLeads,
+        value: l ? fmtNum(l.totalCreated) : '—',
+        sub: 'Created in selected period',
+      },
       {
         def: METRIC_DEFS.sqls,
         value: l?.sqls?.count != null ? fmtNum(l.sqls.count) : '—',
@@ -46,48 +59,27 @@ function Dashboard() {
             : l
               ? `of ${fmtNum(l.totalCreated)} leads created`
               : null,
-        loading: leads.loading,
-        error: leadErr,
+      },
+      {
+        def: METRIC_DEFS.qualifiedPct,
+        value: fmtPct(qualifiedPct),
+        exact: fmtPctExact(qualifiedPct),
+        sub: l ? `${fmtNum(l.sqls?.count)} qualified / ${fmtNum(l.totalCreated)} leads` : null,
       },
       {
         def: METRIC_DEFS.speedToLead,
         value: fmtDays(l?.speedToLead?.days),
+        exact: fmtDaysExact(l?.speedToLead?.days),
         sub: l ? `n = ${fmtNum(l.speedToLead?.n ?? 0)} leads` : null,
-        loading: leads.loading,
-        error: leadErr,
       },
       {
         def: METRIC_DEFS.reachingToConnected,
         value: fmtDays(l?.reachingToConnected?.days),
+        exact: fmtDaysExact(l?.reachingToConnected?.days),
         sub: l ? `n = ${fmtNum(l.reachingToConnected?.n ?? 0)} leads` : null,
-        loading: leads.loading,
-        error: leadErr,
       },
-      {
-        def: METRIC_DEFS.speedToClose,
-        value: fmtDays(d?.speedToClose?.days),
-        sub: d
-          ? `n = ${fmtNum(d.speedToClose?.n ?? 0)} of ${fmtNum(d.speedToClose?.wonTotal ?? 0)} won deals`
-          : null,
-        loading: deals.loading,
-        error: dealErr,
-      },
-      {
-        def: METRIC_DEFS.pctClose,
-        value: fmtPct(d?.pctClose?.pct, 0),
-        sub: d ? `${fmtNum(d.pctClose?.won)} won / ${fmtNum(d.pctClose?.created)} created` : null,
-        loading: deals.loading,
-        error: dealErr,
-      },
-      {
-        def: METRIC_DEFS.meetingShowRate,
-        value: fmtPct(m?.showRate, 0),
-        sub: m ? `${fmtNum(m.completed)} of ${fmtNum(m.booked)} meetings` : null,
-        loading: meetings.loading,
-        error: meetErr,
-      },
-    ];
-  }, [leads, deals, meetings, leadErr, dealErr, meetErr]);
+    ].map((k) => ({ ...k, loading: leads.loading, error: leadErr }));
+  }, [leads, leadErr]);
 
   return (
     <div className="bg-background min-h-screen">
@@ -103,31 +95,31 @@ function Dashboard() {
       />
 
       <main className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-5 sm:px-6">
-        {/* KPI row */}
-        <section className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-6">
-          {kpis.map((k) => (
+        {/* ── Leads ─────────────────────────────────────────────── */}
+        <SectionHeading>Leads</SectionHeading>
+
+        <section aria-label="Lead metrics" className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-5">
+          {leadKpis.map((k) => (
             <MetricCard key={k.def.title} {...k} />
           ))}
         </section>
 
-        {/* Deal funnel + blended value */}
-        <section className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-          <DealStageChart deals={deals} />
-          <PipelineValueCard deals={deals} />
-        </section>
-
-        {/* Lead distributions */}
-        <section className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+        <section aria-label="Lead distributions" className="grid grid-cols-1 gap-4 lg:grid-cols-3">
           <LeadStagesCard leads={leads} />
           <IcpFitCard leads={leads} />
           <MeetingShowRateCard meetings={meetings} />
         </section>
 
-        {/* Rep vs rep */}
         <RepBreakdownTable leads={leads} />
 
-        {/* Lists */}
         <LeadLists leads={leads} />
+
+        {/* ── Deals ─────────────────────────────────────────────── */}
+        <SectionHeading>Deals</SectionHeading>
+
+        <DealStageChart deals={deals} />
+
+        <PipelineValueCard deals={deals} />
 
         <p className="text-muted-foreground pb-4 text-center text-xs">
           Data refreshes automatically every 5 minutes · HubSpot is the source of truth

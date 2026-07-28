@@ -225,15 +225,17 @@ async function compute({ startMs, endMs, ownerIds }) {
     };
   });
 
-  // Qualified / disqualified lists (capped) with company names.
+  // Qualified / disqualified / unscored lists (capped) with company names.
   const disqualifiedLeads = roles.disqualified
     ? results.filter((l) => l.properties?.hs_pipeline_stage === roles.disqualified)
     : [];
+  const unscoredLeads = results.filter((l) => !l.properties?.[PROPS.leadIcpFit]);
   const qualifiedRows = qualifiedLeads.slice(0, FETCH_CAPS.listRows);
   const disqualifiedRows = disqualifiedLeads.slice(0, FETCH_CAPS.listRows);
+  const unscoredRows = unscoredLeads.slice(0, FETCH_CAPS.listRows);
 
   const companyNames = await resolveCompanies([
-    ...new Set([...qualifiedRows, ...disqualifiedRows].map((l) => String(l.id))),
+    ...new Set([...qualifiedRows, ...disqualifiedRows, ...unscoredRows].map((l) => String(l.id))),
   ]);
 
   return {
@@ -265,9 +267,17 @@ async function compute({ startMs, endMs, ownerIds }) {
       reason: l.properties?.[PROPS.leadDisqualifyReason] || null,
       ownerId: l.properties?.hubspot_owner_id,
     })),
+    unscoredList: unscoredRows.map((l) => ({
+      id: l.id,
+      name: l.properties?.[PROPS.leadName] || null,
+      company: companyNames.get(String(l.id)),
+      stageLabel: stageLabel.get(l.properties?.hs_pipeline_stage) || null,
+      ownerId: l.properties?.hubspot_owner_id,
+    })),
     listCaps: {
       qualified: { shown: qualifiedRows.length, total: qualifiedLeads.length },
       disqualified: { shown: disqualifiedRows.length, total: disqualifiedLeads.length },
+      unscored: { shown: unscoredRows.length, total: unscoredLeads.length },
     },
     truncated,
     fetchedAt: new Date().toISOString(),
