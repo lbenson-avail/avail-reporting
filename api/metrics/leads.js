@@ -97,20 +97,20 @@ async function compute({ startMs, endMs, ownerIds }) {
     .map((id) => dateEnteredProp(id));
 
   const filters = [ownerFilter(ownerIds)];
-  if (startMs != null) filters.push(rangeFilter('createdate', startMs, endMs));
+  if (startMs != null) filters.push(rangeFilter(PROPS.leadCreateDate, startMs, endMs));
 
   const { results, total, truncated } = await hsSearchAll('leads', {
     filterGroups: [{ filters }],
     properties: [
       'hs_pipeline_stage',
-      'createdate',
+      PROPS.leadCreateDate,
       'hubspot_owner_id',
       PROPS.leadName,
       PROPS.leadIcpFit,
       PROPS.leadDisqualifyReason,
       ...roleProps,
     ],
-    sorts: [{ propertyName: 'createdate', direction: 'DESCENDING' }],
+    sorts: [{ propertyName: PROPS.leadCreateDate, direction: 'DESCENDING' }],
   });
 
   const enteredQualified = roles.qualified ? dateEnteredProp(roles.qualified) : null;
@@ -131,7 +131,9 @@ async function compute({ startMs, endMs, ownerIds }) {
 
   // Timing metrics.
   const speedToLead = enteredReaching
-    ? avgDays(results.map((l) => [l.properties?.createdate, l.properties?.[enteredReaching]]))
+    ? avgDays(
+        results.map((l) => [l.properties?.[PROPS.leadCreateDate], l.properties?.[enteredReaching]])
+      )
     : { days: null, n: 0 };
   const reachingToConnected =
     enteredReaching && enteredConnected
