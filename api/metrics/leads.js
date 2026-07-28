@@ -171,22 +171,30 @@ async function compute({ startMs, endMs, ownerIds }) {
 
   // Per-role visibility into which timestamp property this portal populates —
   // makes an empty timing metric diagnosable from the API response.
-  const timingDiagnostics = Object.fromEntries(
-    Object.entries(roles).map(([role, id]) => [
-      role,
-      id
-        ? {
-            stageId: id,
-            counts: Object.fromEntries(
-              roleEnteredProps[role].map((p) => [
-                p,
-                results.filter((l) => l.properties?.[p]).length,
-              ])
-            ),
-          }
-        : null,
-    ])
-  );
+  const timingDiagnostics = {
+    // Whether the token could list lead properties, and every date_entered
+    // property the portal actually has — the ground truth for stage matching.
+    schema: {
+      readable: portalEnteredProps !== null,
+      dateEnteredProps: portalEnteredProps || [],
+    },
+    ...Object.fromEntries(
+      Object.entries(roles).map(([role, id]) => [
+        role,
+        id
+          ? {
+              stageId: id,
+              counts: Object.fromEntries(
+                roleEnteredProps[role].map((p) => [
+                  p,
+                  results.filter((l) => l.properties?.[p]).length,
+                ])
+              ),
+            }
+          : null,
+      ])
+    ),
+  };
 
   // ICP fit distribution.
   const icpCounts = ICP_CATEGORIES.map((cat) => ({
