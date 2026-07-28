@@ -1,0 +1,49 @@
+// GET /api/metrics/meetings?start&end&owner
+// Metric: meeting show rate — outcome counts for meetings that start in the
+// selected period, scoped to the sales owners.
+
+import { MEETING_OUTCOMES } from '../../lib/config.js';
+import { requireAuth } from '../_lib/auth.js';
+import { parseParams } from '../_lib/params.js';
+import { cached } from '../_lib/cache.js';
+import { hsCount, ownerFilter, rangeFilter, HsError } from '../_lib/hubspot.js';
+
+async function compute({ startMs, endMs, ownerIds }) {
+  const counts = {};
+  await Promise.all(
+    MEETING_OUTCOMES.map(async (outcome) => {
+      const filters = [
+        { propertyName: 'hs_meeting_outcome', operator: 'EQ', value: outcome },
+        ownerFilter(ownerIds),
+      ];
+      if (startMs != null) filters.push(rangeFilter('hs_meeting_start_time', startMs, endMs));
+      counts[outcome] = await hsCount('meetings', [{ filters }]);
+    })
+  );
+
+  const booked = MEETING_OUTCOMES.reduce((s, o) => s + counts[o], 0);
+  return {
+    counts,
+    booked,
+    completed: counts.COMPLETED,
+    showRate: booked > 0 ? (counts.COMPLETED / booked) * 100 : null,
+    fetchedAt: new Date().toISOString(),
+  };
+}
+
+export default async function handler(req, res) {
+  if (!requireAuth(req, res)) return;
+  const params = parseParams(req, res);
+  if (!params) return;
+
+  try {
+    const data = await cached(`meetings:${params.key}`, () => compute(params));
+    res.status(200).json(data);
+  } catch (err) {
+    const status = err instanceof HsError && err.isAuthOrScope ? 502 : 500;
+    res.status(status).json({
+      error: err instanceof HsError && err.isAuthOrScope ? 'hubspot_access' : 'server_error',
+      message: String(err.message || err),
+    });
+  }
+}

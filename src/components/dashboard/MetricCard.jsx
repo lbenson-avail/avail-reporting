@@ -1,0 +1,37 @@
+import { Card, CardContent } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
+import { InfoTip } from './InfoTip';
+import { cn } from '@/lib/utils';
+
+// Generic KPI card: label + tooltip, one hero figure, an optional sub line.
+export function MetricCard({ def, value, sub, loading, error, accentClass, children }) {
+  return (
+    <Card className="gap-0 py-4">
+      <CardContent className="px-4">
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
+            {def.title}
+          </span>
+          <InfoTip text={def.tooltip} />
+        </div>
+        <div className="mt-2">
+          {loading ? (
+            <Skeleton className="h-8 w-24" />
+          ) : error ? (
+            <span className="text-destructive text-sm" title={error}>
+              Unavailable
+            </span>
+          ) : (
+            <span className={cn('text-2xl font-semibold tracking-tight', accentClass)}>
+              {value}
+            </span>
+          )}
+        </div>
+        {!loading && !error && sub && (
+          <p className="text-muted-foreground mt-1 text-xs">{sub}</p>
+        )}
+        {!loading && !error && children}
+      </CardContent>
+    </Card>
+  );
+}
