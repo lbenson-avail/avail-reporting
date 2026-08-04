@@ -156,6 +156,15 @@ async function compute({ startMs, endMs, ownerIds }) {
   const knownSourceTotal = sources.reduce((s, r) => s + r.count, 0);
   const noSource = results.filter((l) => !sourceOf(l)).length;
   const otherSource = results.length - knownSourceTotal - noSource;
+  // The distinct resolved labels hiding inside "Other", so the bar can
+  // explain itself on hover.
+  const otherSourceValues = [
+    ...new Set(
+      results
+        .map((l) => sourceOf(l))
+        .filter((s) => s && !canonicalSources.has(s.toLowerCase()))
+    ),
+  ].slice(0, 8);
 
   const channel = (sourceName) => {
     const leads = results.filter((l) => sourceOf(l) === sourceName).length;
@@ -209,6 +218,7 @@ async function compute({ startMs, endMs, ownerIds }) {
     icpQB,
     sources,
     otherSource,
+    otherSourceValues,
     noSource,
     channels: {
       paidSearch: channel('Paid Search'),

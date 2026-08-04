@@ -8,8 +8,8 @@
 import { paidsyncConfigured, paidsyncListTools, paidsyncCallTool } from './paidsync.js';
 
 const CHANNELS = {
-  google: { label: 'Google Ads', match: /google/i },
-  linkedin: { label: 'LinkedIn Ads', match: /linkedin/i },
+  google: { label: 'Google Ads', match: /google/i, accountEnv: 'PAIDSYNC_GOOGLE_ACCOUNT_ID' },
+  linkedin: { label: 'LinkedIn Ads', match: /linkedin/i, accountEnv: 'PAIDSYNC_LINKEDIN_ACCOUNT_ID' },
 };
 
 const cacheTtlMs = () => (Number(process.env.ADS_CACHE_TTL_HOURS) || 12) * 3600 * 1000;
@@ -17,7 +17,9 @@ const adsCache = new Map();
 
 // Pick the best-looking campaign-performance tool for a channel from the
 // (unmetered) tool catalog, so schema drift on PaidSync's side degrades to a
-// readable reason instead of a wrong hardcoded name.
+// readable reason instead of a wrong hardcoded name. PaidSync serves
+// platforms through shared report tools + a platform argument, so both
+// channels fall back to the generic get_campaign_performance.
 async function resolveTool(channel) {
   const tools = await paidsyncListTools();
   const { match } = CHANNELS[channel];
@@ -26,8 +28,25 @@ async function resolveTool(channel) {
     .map((t) => ({ t, channelHit: match.test(t.name) || match.test(t.description || '') }));
   const preferred =
     scored.find((s) => s.channelHit)?.t ||
-    (channel === 'google' ? tools.find((t) => t.name === 'get_campaign_performance') : null);
+    tools.find((t) => t.name === 'get_campaign_performance') ||
+    scored[0]?.t;
   return preferred || null;
+}
+
+// Find a platform-selecting property on the tool's schema and the value that
+// targets our channel — preferring an enum entry when the schema lists them.
+function platformArg(tool, channel) {
+  const props = tool.inputSchema?.properties || {};
+  const key = ['platform', 'platforms', 'network', 'channel', 'provider', 'ad_platform'].find(
+    (k) => props[k]
+  );
+  if (!key) return null;
+  const { match } = CHANNELS[channel];
+  const spec = props[key];
+  const options = spec?.enum || spec?.items?.enum || null;
+  const value = options ? options.find((o) => match.test(String(o))) : channel;
+  if (options && !value) return null; // schema enumerates platforms but not this one
+  return { key, value: spec?.type === 'array' ? [value] : value };
 }
 
 const iso = (ms) => new Date(ms).toISOString().slice(0, 10);
@@ -85,13 +104,35 @@ export async function getChannelMetrics(channel, startMs, endMs) {
       };
     }
 
+    const { match } = CHANNELS[channel];
+    const channelSpecific = match.test(tool.name) || match.test(tool.description || '');
+    const platform = platformArg(tool, channel);
+    // Google is PaidSync's default platform, so the generic tool works bare;
+    // LinkedIn needs either its own tool or a platform argument to target it.
+    if (channel === 'linkedin' && !channelSpecific && !platform) {
+      return {
+        unavailable: true,
+        reason: `PaidSync's ${tool.name} tool has no platform argument to target LinkedIn Ads — check /api/metrics/ads?debug=1 for its schema.`,
+      };
+    }
+
     const args = {};
+    if (platform) args[platform.key] = platform.value;
     const schemaProps = tool.inputSchema?.properties || {};
     if (schemaProps.date_range) {
-      args.date_range = startMs != null ? 'custom' : 'this_month';
+      // PaidSync's contract: a preset (this_month, last_30_days, …) or
+      // custom dates as one string, "YYYY-MM-DD to YYYY-MM-DD".
+      args.date_range =
+        startMs != null && endMs != null ? `${iso(startMs)} to ${iso(endMs)}` : 'this_month';
     }
     if (schemaProps.start_date && startMs != null) args.start_date = iso(startMs);
     if (schemaProps.end_date && endMs != null) args.end_date = iso(endMs);
+
+    const accountId = process.env[CHANNELS[channel].accountEnv];
+    if (accountId) {
+      const accountKey = ['account_id', 'customer_id', 'account'].find((k) => schemaProps[k]);
+      if (accountKey) args[accountKey] = accountId;
+    }
 
     const report = await paidsyncCallTool(tool.name, args);
     const summary = summarize(report);

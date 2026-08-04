@@ -10,6 +10,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useMarketingMetrics } from '@/hooks/useMarketingMetrics';
 import { DashboardHeader } from '@/components/dashboard/DashboardHeader';
 import { MetricCard } from '@/components/dashboard/MetricCard';
@@ -233,14 +234,32 @@ export default function MarketingDashboard() {
                       color="var(--viz-missing)"
                     />
                   )}
-                  {d.otherSource > 0 && (
-                    <BarRow
-                      label="Other"
-                      value={d.otherSource}
-                      max={sourceMax}
-                      color="var(--muted-foreground)"
-                    />
-                  )}
+                  {d.otherSource > 0 &&
+                    (d.otherSourceValues?.length ? (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <div className="cursor-help">
+                            <BarRow
+                              label="Other"
+                              value={d.otherSource}
+                              max={sourceMax}
+                              color="var(--muted-foreground)"
+                            />
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent side="top" className="max-w-64">
+                          Source value{d.otherSourceValues.length === 1 ? '' : 's'} in Other:{' '}
+                          {d.otherSourceValues.join(', ')}
+                        </TooltipContent>
+                      </Tooltip>
+                    ) : (
+                      <BarRow
+                        label="Other"
+                        value={d.otherSource}
+                        max={sourceMax}
+                        color="var(--muted-foreground)"
+                      />
+                    ))}
                 </>
               )}
             </CardContent>
