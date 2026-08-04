@@ -1,26 +1,42 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { fetchJson } from '@/lib/api';
 import { POLL_INTERVAL_MS } from '../../lib/config.js';
+import { previousRange } from '@/hooks/useMetrics';
 
 const initial = { data: null, error: null, loading: true };
 
 // Marketing page data: the HubSpot marketing rollup plus the ad-platform
 // metrics, fetched independently so an ads outage never blanks lead data.
+// The previous period (for trends) covers HubSpot data only — PaidSync calls
+// are metered, so ads never fetch a comparison window.
 export function useMarketingMetrics({ start, end, owner }) {
   const [marketing, setMarketing] = useState(initial);
   const [ads, setAds] = useState(initial);
+  const [previous, setPrevious] = useState(null);
   const [lastUpdated, setLastUpdated] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
   const generation = useRef(0);
+
+  const prevRange = useMemo(() => previousRange(start, end), [start, end]);
 
   const load = useCallback(async () => {
     const gen = ++generation.current;
     setRefreshing(true);
     setMarketing((prev) => ({ ...prev, loading: true }));
     setAds((prev) => ({ ...prev, loading: true }));
+    setPrevious(null);
 
     const params = { start, end, owner };
     await Promise.all([
+      ...(prevRange
+        ? [
+            fetchJson('/api/metrics/marketing', { ...prevRange, owner })
+              .then((data) => {
+                if (generation.current === gen) setPrevious(data);
+              })
+              .catch(() => {}),
+          ]
+        : []),
       fetchJson('/api/metrics/marketing', params)
         .then((data) => {
           if (generation.current === gen) setMarketing({ data, error: null, loading: false });
@@ -43,7 +59,7 @@ export function useMarketingMetrics({ start, end, owner }) {
       setLastUpdated(new Date());
       setRefreshing(false);
     }
-  }, [start, end, owner]);
+  }, [start, end, owner, prevRange]);
 
   useEffect(() => {
     load();
@@ -58,5 +74,5 @@ export function useMarketingMetrics({ start, end, owner }) {
     };
   }, [load]);
 
-  return { marketing, ads, lastUpdated, refreshing, refresh: load };
+  return { marketing, ads, previous, lastUpdated, refreshing, refresh: load };
 }

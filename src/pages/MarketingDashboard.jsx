@@ -13,7 +13,7 @@ import {
 import { useMarketingMetrics } from '@/hooks/useMarketingMetrics';
 import { DashboardHeader } from '@/components/dashboard/DashboardHeader';
 import { MetricCard } from '@/components/dashboard/MetricCard';
-import { BenchmarkChip } from '@/components/dashboard/BenchmarkChip';
+import { TrendChip } from '@/components/dashboard/TrendChip';
 import { BarRow } from '@/components/dashboard/BarRow';
 import { InfoTip } from '@/components/dashboard/InfoTip';
 import { LeadsError } from '@/components/dashboard/LeadsError';
@@ -24,11 +24,7 @@ import {
   ReasonCell,
 } from '@/components/dashboard/table-bits';
 import { buildPresets, presetToRange } from '@/components/dashboard/DateRangePicker';
-import {
-  MARKETING_BENCHMARKS,
-  MARKETING_DEFS,
-  SALES_OWNERS,
-} from '../../lib/config.js';
+import { MARKETING_DEFS, SALES_OWNERS } from '../../lib/config.js';
 import { fmtMoneyExact, fmtNum, fmtPct, fmtPctExact } from '@/lib/format';
 import { ICP_COLORS, UNSCORED_COLOR } from '@/lib/icpColors';
 import { repColor, repName, repShort } from '@/lib/repColors';
@@ -46,7 +42,7 @@ function SectionCardHeader({ def }) {
 
 // Paid channel card: HubSpot funnel numbers always live; ad-platform metrics
 // activate when credentials exist, otherwise show why they're absent.
-function ChannelCard({ def, data, adsChannel, benchmarks, loading, error }) {
+function ChannelCard({ def, data, adsChannel, prevChannel, loading, error }) {
   const rate = data?.qualifyRate;
   const spend = adsChannel && !adsChannel.unavailable ? adsChannel.spend : null;
   const cpl = spend != null && data?.leads > 0 ? spend / data.leads : null;
@@ -68,13 +64,13 @@ function ChannelCard({ def, data, adsChannel, benchmarks, loading, error }) {
                 </p>
                 <p className="mt-1 flex items-baseline gap-2 text-2xl font-semibold tabular-nums tracking-tight">
                   {fmtNum(data.leads)}
-                  {benchmarks?.leads != null && (
-                    <BenchmarkChip
-                      current={data.leads}
-                      benchmark={benchmarks.leads}
-                      format={fmtNum}
-                    />
-                  )}
+                  <TrendChip
+                    current={data.leads}
+                    previous={prevChannel?.leads}
+                    detail={
+                      prevChannel ? `Previous period: ${fmtNum(prevChannel.leads)} leads` : null
+                    }
+                  />
                 </p>
               </div>
               <div>
@@ -91,14 +87,16 @@ function ChannelCard({ def, data, adsChannel, benchmarks, loading, error }) {
                 </p>
                 <p className="mt-1 flex items-baseline gap-2 text-2xl font-semibold tabular-nums tracking-tight">
                   {fmtPct(rate)}
-                  {benchmarks?.qualifyRate != null && (
-                    <BenchmarkChip
-                      current={rate}
-                      benchmark={benchmarks.qualifyRate}
-                      mode="pts"
-                      format={(v) => fmtPctExact(v)}
-                    />
-                  )}
+                  <TrendChip
+                    current={rate}
+                    previous={prevChannel?.qualifyRate}
+                    mode="pts"
+                    detail={
+                      prevChannel
+                        ? `Previous period: ${fmtPct(prevChannel.qualifyRate)}`
+                        : null
+                    }
+                  />
                 </p>
               </div>
             </div>
@@ -112,17 +110,7 @@ function ChannelCard({ def, data, adsChannel, benchmarks, loading, error }) {
                   </div>
                   <div>
                     <p className="text-muted-foreground text-xs">CPL</p>
-                    <p className="flex items-baseline gap-2 font-medium tabular-nums">
-                      {fmtMoneyExact(cpl)}
-                      {benchmarks?.cpl != null && cpl != null && (
-                        <BenchmarkChip
-                          current={cpl}
-                          benchmark={benchmarks.cpl}
-                          goodDirection="down"
-                          format={fmtMoneyExact}
-                        />
-                      )}
-                    </p>
+                    <p className="font-medium tabular-nums">{fmtMoneyExact(cpl)}</p>
                   </div>
                   <div>
                     <p className="text-muted-foreground text-xs">Impressions</p>
@@ -145,15 +133,24 @@ function ChannelCard({ def, data, adsChannel, benchmarks, loading, error }) {
 export default function MarketingDashboard() {
   const [range, setRange] = useState(() => presetToRange(buildPresets()[0])); // This month (MTD)
   const [owner, setOwner] = useState(null);
-  const { marketing, ads, lastUpdated, refreshing, refresh } = useMarketingMetrics({
+  const { marketing, ads, previous, lastUpdated, refreshing, refresh } = useMarketingMetrics({
     start: range.start,
     end: range.end,
     owner,
   });
 
   const d = marketing.data;
+  const prev = previous;
   const err = marketing.error ? String(marketing.error.message) : null;
-  const B = MARKETING_BENCHMARKS;
+
+  const countTrend = (current, previousValue, label, goodDirection = 'up') => (
+    <TrendChip
+      current={current}
+      previous={previousValue}
+      goodDirection={goodDirection}
+      detail={previousValue != null ? `Previous period: ${fmtNum(previousValue)} ${label}` : null}
+    />
+  );
 
   const kpis = [
     {
@@ -162,38 +159,28 @@ export default function MarketingDashboard() {
       sub: d?.totalLeads.duplicates
         ? `${fmtNum(d.totalLeads.duplicates)} duplicate${d.totalLeads.duplicates === 1 ? '' : 's'} merged`
         : 'Created in selected period',
-      trend: <BenchmarkChip current={d?.totalLeads.count} benchmark={B.totalLeads} format={fmtNum} />,
+      trend: countTrend(d?.totalLeads.count, prev?.totalLeads?.count, 'leads'),
     },
     {
       def: MARKETING_DEFS.qualifiedBuyers,
       value: d ? fmtNum(d.stages.qualifiedBuyers) : '—',
       sub: d ? `of ${fmtNum(d.totalLeads.count)} leads` : null,
-      trend: (
-        <BenchmarkChip
-          current={d?.stages.qualifiedBuyers}
-          benchmark={B.qualifiedBuyers}
-          format={fmtNum}
-        />
-      ),
+      trend: countTrend(d?.stages.qualifiedBuyers, prev?.stages?.qualifiedBuyers, 'qualified'),
     },
     {
       def: MARKETING_DEFS.opportunities,
       value: d ? fmtNum(d.stages.opportunities) : '—',
-      trend: (
-        <BenchmarkChip
-          current={d?.stages.opportunities}
-          benchmark={B.opportunities}
-          format={fmtNum}
-        />
-      ),
+      trend: countTrend(d?.stages.opportunities, prev?.stages?.opportunities, 'opportunities'),
     },
     {
       def: MARKETING_DEFS.customers,
       value: d ? fmtNum(d.stages.customers) : '—',
+      trend: countTrend(d?.stages.customers, prev?.stages?.customers, 'customers'),
     },
     {
       def: MARKETING_DEFS.disqualified,
       value: d ? fmtNum(d.stages.disqualified) : '—',
+      trend: countTrend(d?.stages.disqualified, prev?.stages?.disqualified, 'disqualified', 'down'),
     },
   ].map((k) => ({ ...k, loading: marketing.loading, error: err }));
 
@@ -317,11 +304,7 @@ export default function MarketingDashboard() {
             def={MARKETING_DEFS.paidSearch}
             data={d?.channels.paidSearch}
             adsChannel={ads.data?.google}
-            benchmarks={{
-              leads: B.paidSearchLeads,
-              qualifyRate: B.paidSearchQualifyRate,
-              cpl: B.paidSearchCPL,
-            }}
+            prevChannel={prev?.channels?.paidSearch}
             loading={marketing.loading}
             error={marketing.error && err}
           />
@@ -329,7 +312,7 @@ export default function MarketingDashboard() {
             def={MARKETING_DEFS.paidSocial}
             data={d?.channels.paidSocial}
             adsChannel={ads.data?.linkedin}
-            benchmarks={null}
+            prevChannel={prev?.channels?.paidSocial}
             loading={marketing.loading}
             error={marketing.error && err}
           />
@@ -449,7 +432,7 @@ export default function MarketingDashboard() {
         </Card>
 
         <p className="text-muted-foreground pb-4 text-center text-xs">
-          Benchmarks are Q1 2026 monthly averages · Scoped to{' '}
+          Trends compare to the previous period of the same length · Scoped to{' '}
           {SALES_OWNERS.map((o) => o.shortName).join(' & ')} · Data refreshes every 5 minutes
         </p>
       </main>
