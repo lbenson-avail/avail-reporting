@@ -15,10 +15,18 @@ const CHANNELS = {
 const cacheTtlMs = () => (Number(process.env.ADS_CACHE_TTL_HOURS) || 12) * 3600 * 1000;
 const adsCache = new Map();
 
+// Serializes set_active_account → report pairs across channels.
+let accountLock = Promise.resolve();
+function withAccountLock(fn) {
+  const run = accountLock.then(fn, fn);
+  accountLock = run.catch(() => {});
+  return run;
+}
+
 // Pick the best-looking campaign-performance tool for a channel from the
 // (unmetered) tool catalog, so schema drift on PaidSync's side degrades to a
-// readable reason instead of a wrong hardcoded name. PaidSync serves
-// platforms through shared report tools + a platform argument, so both
+// readable reason instead of a wrong hardcoded name. PaidSync serves every
+// platform through shared report tools (targeted by active account), so both
 // channels fall back to the generic get_campaign_performance.
 async function resolveTool(channel) {
   const tools = await paidsyncListTools();
@@ -31,6 +39,55 @@ async function resolveTool(channel) {
     tools.find((t) => t.name === 'get_campaign_performance') ||
     scored[0]?.t;
   return preferred || null;
+}
+
+// ─── Account selection ───────────────────────────────────────────────────────
+// PaidSync targets ad platforms by selecting an ad account ("No active
+// account set. Use set_active_account first."), not by a platform argument.
+// Discover the account lister/setter tools from the unmetered catalog, list
+// the connected accounts once (metered, cached), and pick per channel.
+
+async function resolveAccountTools() {
+  const tools = await paidsyncListTools();
+  const accountish = tools.filter(
+    (t) => /account/i.test(t.name) && /(list|get|available|connected)/i.test(t.name) && !/set/i.test(t.name)
+  );
+  const lister = accountish.find((t) => /list/i.test(t.name)) || accountish[0];
+  const setter =
+    tools.find((t) => t.name === 'set_active_account') ||
+    tools.find((t) => /set.*account/i.test(t.name));
+  return { lister, setter };
+}
+
+// Caches the in-flight promise so concurrent channels share one metered call.
+let accountsCache = null; // { at, promise }
+
+function getAccounts(lister) {
+  if (accountsCache && Date.now() - accountsCache.at < cacheTtlMs()) {
+    return accountsCache.promise;
+  }
+  const promise = paidsyncCallTool(lister.name, {}).then((result) => {
+    const raw = Array.isArray(result)
+      ? result
+      : result?.accounts || result?.data || result?.results || [];
+    return (Array.isArray(raw) ? raw : [raw]).map((a) => ({
+      id: a?.id ?? a?.account_id ?? a?.customer_id ?? null,
+      platform: a?.platform ?? a?.provider ?? a?.channel ?? a?.type ?? '',
+      name: a?.name ?? a?.account_name ?? '',
+    }));
+  });
+  accountsCache = { at: Date.now(), promise };
+  promise.catch(() => {
+    accountsCache = null; // don't cache a failed listing
+  });
+  return promise;
+}
+
+function pickAccount(accounts, channel) {
+  const envId = process.env[CHANNELS[channel].accountEnv];
+  if (envId) return { id: envId, name: '(from env)' };
+  const { match } = CHANNELS[channel];
+  return accounts.find((a) => match.test(`${a.platform} ${a.name}`)) || null;
 }
 
 // Find a platform-selecting property on the tool's schema and the value that
@@ -104,17 +161,7 @@ export async function getChannelMetrics(channel, startMs, endMs) {
       };
     }
 
-    const { match } = CHANNELS[channel];
-    const channelSpecific = match.test(tool.name) || match.test(tool.description || '');
     const platform = platformArg(tool, channel);
-    // Google is PaidSync's default platform, so the generic tool works bare;
-    // LinkedIn needs either its own tool or a platform argument to target it.
-    if (channel === 'linkedin' && !channelSpecific && !platform) {
-      return {
-        unavailable: true,
-        reason: `PaidSync's ${tool.name} tool has no platform argument to target LinkedIn Ads — check /api/metrics/ads?debug=1 for its schema.`,
-      };
-    }
 
     const args = {};
     if (platform) args[platform.key] = platform.value;
@@ -128,13 +175,47 @@ export async function getChannelMetrics(channel, startMs, endMs) {
     if (schemaProps.start_date && startMs != null) args.start_date = iso(startMs);
     if (schemaProps.end_date && endMs != null) args.end_date = iso(endMs);
 
-    const accountId = process.env[CHANNELS[channel].accountEnv];
-    if (accountId) {
-      const accountKey = ['account_id', 'customer_id', 'account'].find((k) => schemaProps[k]);
-      if (accountKey) args[accountKey] = accountId;
+    // Account targeting. Metering: a cold instance worst-cases at 5 metered
+    // calls per cache window (1 list + a set + report pair per channel) —
+    // the 12h cache keeps that to a handful a day.
+    const { lister, setter } = await resolveAccountTools();
+    let account = null;
+    if (process.env[CHANNELS[channel].accountEnv]) {
+      account = pickAccount([], channel);
+    } else if (lister) {
+      const accounts = await getAccounts(lister);
+      account = pickAccount(accounts, channel);
+      if (!account) {
+        return {
+          unavailable: true,
+          reason: `No ${CHANNELS[channel].label} ad account connected in PaidSync — accounts seen: ${
+            accounts.map((a) => a.name || a.platform || a.id).filter(Boolean).join(', ') || 'none'
+          }. Connect it at paidsync.ai, or set ${CHANNELS[channel].accountEnv} in Vercel.`,
+        };
+      }
     }
 
-    const report = await paidsyncCallTool(tool.name, args);
+    const accountKey = ['account_id', 'customer_id', 'account'].find((k) => schemaProps[k]);
+    let report;
+    if (account?.id && accountKey) {
+      // Cheapest path: the report tool accepts the account inline.
+      args[accountKey] = account.id;
+      report = await paidsyncCallTool(tool.name, args);
+    } else if (account?.id && setter) {
+      // Active account is PaidSync-side session state — serialize the
+      // set→report pair so the two channels never interleave.
+      const setterProps = setter.inputSchema?.properties || {};
+      const setterKey =
+        ['account_id', 'customer_id', 'account', 'id'].find((k) => setterProps[k]) || 'account_id';
+      report = await withAccountLock(async () => {
+        await paidsyncCallTool(setter.name, { [setterKey]: account.id });
+        return paidsyncCallTool(tool.name, args);
+      });
+    } else {
+      // No account machinery discovered — call bare and let PaidSync's own
+      // error surface in the card.
+      report = await paidsyncCallTool(tool.name, args);
+    }
     const summary = summarize(report);
     const value = {
       ...summary,
