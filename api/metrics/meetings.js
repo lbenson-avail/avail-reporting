@@ -8,7 +8,7 @@ import { parseParams } from '../_lib/params.js';
 import { cached } from '../_lib/cache.js';
 import { hsCount, ownerFilter, rangeFilter, HsError } from '../_lib/hubspot.js';
 
-async function compute({ startMs, endMs, ownerIds }) {
+export async function compute({ startMs, endMs, ownerIds }) {
   const counts = {};
   const countWith = (outcomeFilter) => {
     const filters = [outcomeFilter, ownerFilter(ownerIds)];

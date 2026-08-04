@@ -28,7 +28,7 @@ import {
 } from '../_lib/hubspot.js';
 
 
-async function compute({ startMs, endMs, ownerIds }) {
+export async function compute({ startMs, endMs, ownerIds }) {
   const { stages, roles } = await getLeadStages();
   const stageLabel = new Map(stages.map((s) => [s.id, s.label]));
 

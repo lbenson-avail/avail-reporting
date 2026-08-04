@@ -1,4 +1,4 @@
-import { RefreshCw, TriangleAlert } from 'lucide-react';
+import { FileDown, RefreshCw, TriangleAlert } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Select,
@@ -44,30 +44,52 @@ export function DashboardHeader({
           </Tooltip>
         )}
 
-        <Select value={owner || 'all'} onValueChange={(v) => onOwnerChange(v === 'all' ? null : v)}>
-          <SelectTrigger size="sm">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Reps</SelectItem>
-            {SALES_OWNERS.map((o) => (
-              <SelectItem key={o.id} value={o.id}>
-                {o.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        {/* Print header context — replaces the interactive controls on paper */}
+        <span className="text-muted-foreground hidden text-xs print:inline">
+          {[range?.label, range?.start ? `${range.start} – ${range.end}` : null]
+            .filter(Boolean)
+            .join(' · ') || 'All time'}{' '}
+          ·{' '}
+          {SALES_OWNERS.find((o) => o.id === owner)?.name || 'All Reps'} · Exported{' '}
+          {new Date().toLocaleDateString()}
+        </span>
 
-        <DateRangePicker range={range} onChange={onRangeChange} />
+        <div className="flex flex-wrap items-center gap-3 print:hidden">
+          <Select value={owner || 'all'} onValueChange={(v) => onOwnerChange(v === 'all' ? null : v)}>
+            <SelectTrigger size="sm">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Reps</SelectItem>
+              {SALES_OWNERS.map((o) => (
+                <SelectItem key={o.id} value={o.id}>
+                  {o.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
 
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={onRefresh} disabled={refreshing}>
-            <RefreshCw className={cn('size-4', refreshing && 'animate-spin')} />
-            <span className="sr-only sm:not-sr-only">Refresh</span>
+          <DateRangePicker range={range} onChange={onRangeChange} />
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => window.print()}
+            aria-label="Export the dashboard as a PDF via the print dialog"
+          >
+            <FileDown className="size-4" />
+            <span className="sr-only sm:not-sr-only">Export PDF</span>
           </Button>
-          <span className="text-muted-foreground hidden text-xs whitespace-nowrap sm:inline">
-            {refreshing ? 'Updating…' : lastUpdated ? `Updated ${timeAgo(lastUpdated)}` : ''}
-          </span>
+
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={onRefresh} disabled={refreshing}>
+              <RefreshCw className={cn('size-4', refreshing && 'animate-spin')} />
+              <span className="sr-only sm:not-sr-only">Refresh</span>
+            </Button>
+            <span className="text-muted-foreground hidden text-xs whitespace-nowrap sm:inline">
+              {refreshing ? 'Updating…' : lastUpdated ? `Updated ${timeAgo(lastUpdated)}` : ''}
+            </span>
+          </div>
         </div>
       </div>
     </header>

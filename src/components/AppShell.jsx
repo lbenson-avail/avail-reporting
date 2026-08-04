@@ -43,7 +43,7 @@ function NavItem({ to, label, Icon }) {
 export function AppShell() {
   return (
     <div className="bg-background flex min-h-screen">
-      <aside className="border-border sticky top-0 flex h-screen w-14 shrink-0 flex-col border-r px-2 py-4 lg:w-52 lg:px-3">
+      <aside className="border-border sticky top-0 flex h-screen w-14 shrink-0 flex-col border-r px-2 py-4 print:hidden lg:w-52 lg:px-3">
         <div className="mb-6 hidden items-center lg:flex lg:px-2">
           <AvailLogo />
         </div>

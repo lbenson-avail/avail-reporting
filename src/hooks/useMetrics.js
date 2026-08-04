@@ -38,18 +38,25 @@ export function useMetrics({ start, end, owner }) {
   const [lastUpdated, setLastUpdated] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
   const generation = useRef(0);
+  const lastParamsKey = useRef(null);
 
   const prevRange = useMemo(() => previousRange(start, end), [start, end]);
 
   const load = useCallback(async () => {
     const gen = ++generation.current;
+    // Background refreshes (poll / tab focus) keep the current data mounted —
+    // only a filter change or first load shows skeletons. Unmounting tables
+    // mid-session would reset their pagination state.
+    const paramsKey = `${start}|${end}|${owner}`;
+    const hard = lastParamsKey.current !== paramsKey;
+    lastParamsKey.current = paramsKey;
     setRefreshing(true);
     setSections((prev) => ({
-      leads: { ...prev.leads, loading: true },
-      deals: { ...prev.deals, loading: true },
-      meetings: { ...prev.meetings, loading: true },
+      leads: { ...prev.leads, loading: hard || !prev.leads.data },
+      deals: { ...prev.deals, loading: hard || !prev.deals.data },
+      meetings: { ...prev.meetings, loading: hard || !prev.meetings.data },
     }));
-    setPrevious({ leads: null, deals: null, meetings: null });
+    if (hard) setPrevious({ leads: null, deals: null, meetings: null });
 
     const params = { start, end, owner };
     await Promise.all([

@@ -11,6 +11,8 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { Mail, Sprout } from 'lucide-react';
+import { GoogleIcon, LinkedInIcon } from '@/components/BrandIcons';
 import { useMarketingMetrics } from '@/hooks/useMarketingMetrics';
 import { DashboardHeader } from '@/components/dashboard/DashboardHeader';
 import { MetricCard } from '@/components/dashboard/MetricCard';
@@ -30,10 +32,11 @@ import { fmtMoneyExact, fmtNum, fmtPct, fmtPctExact } from '@/lib/format';
 import { ICP_COLORS, UNSCORED_COLOR } from '@/lib/icpColors';
 import { repColor, repName, repShort } from '@/lib/repColors';
 
-function SectionCardHeader({ def }) {
+function SectionCardHeader({ def, icon }) {
   return (
     <CardHeader>
       <CardTitle className="flex items-center gap-1.5 text-sm font-medium">
+        {icon}
         {def.title}
         <InfoTip text={def.tooltip} />
       </CardTitle>
@@ -41,16 +44,17 @@ function SectionCardHeader({ def }) {
   );
 }
 
-// Paid channel card: HubSpot funnel numbers always live; ad-platform metrics
-// activate when credentials exist, otherwise show why they're absent.
-function ChannelCard({ def, data, adsChannel, prevChannel, loading, error }) {
+// Channel card: HubSpot funnel numbers always live. Paid channels also carry
+// an ad-platform strip (spend/CPL) that activates when credentials exist,
+// otherwise shows why it's absent; organic/offline channels skip the strip.
+function ChannelCard({ def, icon, data, adsChannel, showAds = false, prevChannel, loading, error }) {
   const rate = data?.qualifyRate;
   const spend = adsChannel && !adsChannel.unavailable ? adsChannel.spend : null;
   const cpl = spend != null && data?.leads > 0 ? spend / data.leads : null;
 
   return (
     <Card className="gap-3">
-      <SectionCardHeader def={def} />
+      <SectionCardHeader def={def} icon={icon} />
       <CardContent>
         {loading ? (
           <Skeleton className="h-40 w-full" />
@@ -102,28 +106,30 @@ function ChannelCard({ def, data, adsChannel, prevChannel, loading, error }) {
               </div>
             </div>
 
-            <div className="mt-4 border-t pt-3">
-              {spend != null ? (
-                <div className="grid grid-cols-3 gap-4 text-sm">
-                  <div>
-                    <p className="text-muted-foreground text-xs">Spend</p>
-                    <p className="font-medium tabular-nums">{fmtMoneyExact(spend)}</p>
+            {showAds && (
+              <div className="mt-4 border-t pt-3">
+                {spend != null ? (
+                  <div className="grid grid-cols-3 gap-4 text-sm">
+                    <div>
+                      <p className="text-muted-foreground text-xs">Spend</p>
+                      <p className="font-medium tabular-nums">{fmtMoneyExact(spend)}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground text-xs">CPL</p>
+                      <p className="font-medium tabular-nums">{fmtMoneyExact(cpl)}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground text-xs">Impressions</p>
+                      <p className="font-medium tabular-nums">{fmtNum(adsChannel.impressions)}</p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-muted-foreground text-xs">CPL</p>
-                    <p className="font-medium tabular-nums">{fmtMoneyExact(cpl)}</p>
-                  </div>
-                  <div>
-                    <p className="text-muted-foreground text-xs">Impressions</p>
-                    <p className="font-medium tabular-nums">{fmtNum(adsChannel.impressions)}</p>
-                  </div>
-                </div>
-              ) : (
-                <p className="text-muted-foreground text-xs">
-                  {adsChannel?.reason || 'Ad platform metrics not connected yet.'}
-                </p>
-              )}
-            </div>
+                ) : (
+                  <p className="text-muted-foreground text-xs">
+                    {adsChannel?.reason || 'Ad platform metrics not connected yet.'}
+                  </p>
+                )}
+              </div>
+            )}
           </>
         )}
       </CardContent>
@@ -318,20 +324,40 @@ export default function MarketingDashboard() {
           </Card>
         </section>
 
-        <section aria-label="Paid channels" className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <section aria-label="Channels" className="grid grid-cols-1 gap-4 lg:grid-cols-2 2xl:grid-cols-4">
           <ChannelCard
             def={MARKETING_DEFS.paidSearch}
+            icon={<GoogleIcon />}
             data={d?.channels.paidSearch}
             adsChannel={ads.data?.google}
+            showAds
             prevChannel={prev?.channels?.paidSearch}
             loading={marketing.loading}
             error={marketing.error && err}
           />
           <ChannelCard
             def={MARKETING_DEFS.paidSocial}
+            icon={<LinkedInIcon />}
             data={d?.channels.paidSocial}
             adsChannel={ads.data?.linkedin}
+            showAds
             prevChannel={prev?.channels?.paidSocial}
+            loading={marketing.loading}
+            error={marketing.error && err}
+          />
+          <ChannelCard
+            def={MARKETING_DEFS.offline}
+            icon={<Mail className="text-muted-foreground size-4" aria-hidden="true" />}
+            data={d?.channels.offline}
+            prevChannel={prev?.channels?.offline}
+            loading={marketing.loading}
+            error={marketing.error && err}
+          />
+          <ChannelCard
+            def={MARKETING_DEFS.organic}
+            icon={<Sprout className="size-4 text-[color:var(--viz-good)]" aria-hidden="true" />}
+            data={d?.channels.organic}
+            prevChannel={prev?.channels?.organic}
             loading={marketing.loading}
             error={marketing.error && err}
           />

@@ -72,9 +72,16 @@ export function ReasonCell({ reason, notes }) {
   );
 }
 
+// The rows-per-page choice survives remounts and navigation.
+const PAGE_SIZE_KEY = 'avail-rows-per-page';
+const storedPageSize = () => {
+  const v = Number(localStorage.getItem(PAGE_SIZE_KEY));
+  return LIST_PAGE_SIZES.includes(v) ? v : LIST_PAGE_SIZES[0];
+};
+
 // Client-side paginated table shared by the three lead lists.
 export function PaginatedTable({ rows, columns, emptyText, capNote }) {
-  const [pageSize, setPageSize] = useState(LIST_PAGE_SIZES[0]);
+  const [pageSize, setPageSize] = useState(storedPageSize);
   const [page, setPage] = useState(0);
 
   const pageCount = Math.max(1, Math.ceil(rows.length / pageSize));
@@ -128,6 +135,7 @@ export function PaginatedTable({ rows, columns, emptyText, capNote }) {
             onValueChange={(v) => {
               setPageSize(Number(v));
               setPage(0);
+              localStorage.setItem(PAGE_SIZE_KEY, v);
             }}
           >
             <SelectTrigger size="sm" aria-label="Rows per page" className="h-7 gap-1 px-2 text-xs">

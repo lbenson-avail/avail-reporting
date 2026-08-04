@@ -10,6 +10,7 @@ import {
   FETCH_CAPS,
   LEAD_SOURCES,
   LEAD_TYPES,
+  ORGANIC_SOURCES,
   ICP_CATEGORIES,
 } from '../../lib/config.js';
 import { requireAuth } from '../_lib/auth.js';
@@ -44,7 +45,7 @@ function resolveProp(portalProps, configured, stem) {
     : { name: configured, verified: false };
 }
 
-async function compute({ startMs, endMs, ownerIds }) {
+export async function compute({ startMs, endMs, ownerIds }) {
   const [{ roles }, portalProps, portalId] = await Promise.all([
     getLeadStages(),
     getLeadPropertyNames(),
@@ -166,9 +167,10 @@ async function compute({ startMs, endMs, ownerIds }) {
     ),
   ].slice(0, 8);
 
-  const channel = (sourceName) => {
-    const leads = results.filter((l) => sourceOf(l) === sourceName).length;
-    const qbs = qbLeads.filter((l) => sourceOf(l) === sourceName).length;
+  const channel = (...sourceNames) => {
+    const inChannel = (l) => sourceNames.includes(sourceOf(l));
+    const leads = results.filter(inChannel).length;
+    const qbs = qbLeads.filter(inChannel).length;
     return {
       leads,
       qbs,
@@ -223,6 +225,8 @@ async function compute({ startMs, endMs, ownerIds }) {
     channels: {
       paidSearch: channel('Paid Search'),
       paidSocial: channel('Paid Social'),
+      offline: channel('Offline Sources'),
+      organic: channel(...ORGANIC_SOURCES),
     },
     leadTypes,
     perRep,

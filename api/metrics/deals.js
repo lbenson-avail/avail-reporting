@@ -18,7 +18,7 @@ import { hsSearchAll, ownerFilter, rangeFilter, avgDays, HsError } from '../_lib
 
 const STAGE1_ENTERED = dateEnteredProp(DEAL_STAGES[0].id);
 
-async function compute({ startMs, endMs, ownerIds }) {
+export async function compute({ startMs, endMs, ownerIds }) {
   const baseFilters = [
     { propertyName: 'pipeline', operator: 'EQ', value: ACCOUNT_PIPELINE_ID },
     ownerFilter(ownerIds),

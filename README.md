@@ -29,6 +29,33 @@ browser. The whole dashboard sits behind a shared password.
    - `DASHBOARD_PASSWORD` — the shared password the team enters to view.
 3. Deploy. Share the URL + password with the team.
 
+## Connect Claude (MCP)
+
+The app serves its metrics over MCP at `/api/mcp`, so Claude can read and
+analyze the reporting directly — same numbers as the dashboards, plus a
+time-trends tool the pages don't have.
+
+Add it as a custom connector in claude.ai:
+
+1. claude.ai → **Settings → Connectors → Add custom connector**
+2. URL: `https://<your-app>.vercel.app/api/mcp?key=<DASHBOARD_PASSWORD>`
+3. Name it e.g. **Avail Reporting**, save, and enable it in a chat.
+
+Tools exposed:
+
+- `get_sales_metrics {start?, end?, rep?}` — the Sales dashboard rollup
+  (lead KPIs, stage counts, ICP, rep funnel, deal stages, blended pipeline
+  value, speed/percent to close, meeting show rate).
+- `get_marketing_metrics {start?, end?, rep?}` — the Marketing dashboard
+  rollup (deduped totals, stage counts, sources, channel funnels, lead
+  types, per-rep, disqualified list).
+- `get_time_trends {granularity: week|month, periods}` — weekly/monthly
+  series of leads created, current QB/disqualified counts, deals created,
+  deals won, and won value, for trend questions.
+
+Dates are `YYYY-MM-DD` (UTC); omit both for all time. `rep` accepts a rep
+name. The endpoint is read-only and shares the dashboard password.
+
 ## Verify HubSpot configuration
 
 Lead pipeline stage IDs and a couple of property names are portal-specific.

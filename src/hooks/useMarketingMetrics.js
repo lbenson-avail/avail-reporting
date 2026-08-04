@@ -16,15 +16,21 @@ export function useMarketingMetrics({ start, end, owner }) {
   const [lastUpdated, setLastUpdated] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
   const generation = useRef(0);
+  const lastParamsKey = useRef(null);
 
   const prevRange = useMemo(() => previousRange(start, end), [start, end]);
 
   const load = useCallback(async () => {
     const gen = ++generation.current;
+    // Background refreshes keep current data mounted (skeletons unmount the
+    // tables and reset their pagination); only filter changes reload hard.
+    const paramsKey = `${start}|${end}|${owner}`;
+    const hard = lastParamsKey.current !== paramsKey;
+    lastParamsKey.current = paramsKey;
     setRefreshing(true);
-    setMarketing((prev) => ({ ...prev, loading: true }));
-    setAds((prev) => ({ ...prev, loading: true }));
-    setPrevious(null);
+    setMarketing((prev) => ({ ...prev, loading: hard || !prev.data }));
+    setAds((prev) => ({ ...prev, loading: hard || !prev.data }));
+    if (hard) setPrevious(null);
 
     const params = { start, end, owner };
     await Promise.all([
