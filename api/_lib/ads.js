@@ -66,8 +66,11 @@ async function resolveAccountTools(channel) {
   const setters = tools.filter(
     (t) => /set/i.test(t.name) && /account/i.test(t.name) && !/clear/i.test(t.name)
   );
+  // Name matches beat description matches — set_active_account's description
+  // mentions every platform, which otherwise shadows set_linkedin_ad_account.
   const setter =
-    setters.find((t) => match.test(t.name) || match.test(t.description || '')) ||
+    setters.find((t) => match.test(t.name)) ||
+    setters.find((t) => match.test(t.description || '')) ||
     tools.find((t) => t.name === 'set_active_account') ||
     setters.find((t) => /active/i.test(t.name));
   const accountToolNames = tools

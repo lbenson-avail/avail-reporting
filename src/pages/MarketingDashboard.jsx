@@ -124,8 +124,11 @@ function ChannelCard({ def, icon, data, adsChannel, showAds = false, prevChannel
                     </div>
                   </div>
                 ) : (
-                  <p className="text-muted-foreground text-xs">
-                    {adsChannel?.reason || 'Ad platform metrics not connected yet.'}
+                  <p className="text-muted-foreground flex items-center gap-1.5 text-xs">
+                    Ad spend not connected
+                    <InfoTip
+                      text={adsChannel?.reason || 'Ad platform metrics activate once PaidSync is configured in Vercel.'}
+                    />
                   </p>
                 )}
               </div>
