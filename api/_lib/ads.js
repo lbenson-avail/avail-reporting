@@ -5,11 +5,18 @@
 //
 // Without PAIDSYNC_API_KEY, channels report a clean "not connected" state.
 
+import { AD_ACCOUNT_IDS } from '../../lib/config.js';
 import { paidsyncConfigured, paidsyncListTools, paidsyncCallTool } from './paidsync.js';
 
 const CHANNELS = {
   google: { label: 'Google Ads', match: /google/i, accountEnv: 'PAIDSYNC_GOOGLE_ACCOUNT_ID' },
   linkedin: { label: 'LinkedIn Ads', match: /linkedin/i, accountEnv: 'PAIDSYNC_LINKEDIN_ACCOUNT_ID' },
+};
+
+// Env var overrides the config default; either may be human-formatted.
+const configuredAccountId = (channel) => {
+  const raw = process.env[CHANNELS[channel].accountEnv] || AD_ACCOUNT_IDS[channel];
+  return raw ? normalizeAccountId(raw) : null;
 };
 
 const cacheTtlMs = () => (Number(process.env.ADS_CACHE_TTL_HOURS) || 12) * 3600 * 1000;
@@ -109,8 +116,8 @@ function getAccounts(lister) {
 const normalizeAccountId = (v) => String(v).trim().replace(/[\s-]+/g, '');
 
 function pickAccount(accounts, channel) {
-  const envId = process.env[CHANNELS[channel].accountEnv];
-  if (envId) return { id: normalizeAccountId(envId), name: '(from env)' };
+  const configured = configuredAccountId(channel);
+  if (configured) return { id: configured, name: '(configured)' };
   const { match } = CHANNELS[channel];
   return accounts.find((a) => match.test(`${a.platform} ${a.name}`)) || null;
 }
@@ -204,8 +211,7 @@ export async function getChannelMetrics(channel, startMs, endMs) {
     // calls per cache window (1 list + a set + report pair per channel) —
     // the 12h cache keeps that to a handful a day.
     const { lister, setter, accountToolNames } = await resolveAccountTools(channel);
-    const envId = process.env[CHANNELS[channel].accountEnv];
-    let accountId = envId ? normalizeAccountId(envId) : null;
+    let accountId = configuredAccountId(channel);
     if (!accountId && lister) {
       let accounts;
       try {
@@ -297,8 +303,7 @@ export async function adsDiscover() {
   const out = {};
   for (const channel of Object.keys(CHANNELS)) {
     const { setter, accountToolNames } = await resolveAccountTools(channel);
-    const envId = process.env[CHANNELS[channel].accountEnv];
-    const accountId = envId ? normalizeAccountId(envId) : null;
+    const accountId = configuredAccountId(channel);
     if (!setter) {
       out[channel] = { error: `no account setter found (account tools: ${accountToolNames || 'none'})` };
       continue;

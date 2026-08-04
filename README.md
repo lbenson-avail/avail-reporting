@@ -10,9 +10,10 @@ Ad-platform metrics (Google Ads spend/CPL, LinkedIn) flow through
 **PaidSync** (MCP-over-HTTP is PaidSync's API): set `PAIDSYNC_API_KEY` in
 Vercel to activate them. PaidSync meters per tool call, so ads data is cached
 server-side for `ADS_CACHE_TTL_HOURS` (default 12) instead of polling.
-Then set the ad-account ids so PaidSync can select the right accounts:
-`PAIDSYNC_GOOGLE_ACCOUNT_ID` (Google Ads customer ID, dashes optional) and
-`PAIDSYNC_LINKEDIN_ACCOUNT_ID` (Campaign Manager account ID).
+The ad-account ids PaidSync selects ship as defaults in `lib/config.js`
+(`AD_ACCOUNT_IDS`); set `PAIDSYNC_GOOGLE_ACCOUNT_ID` /
+`PAIDSYNC_LINKEDIN_ACCOUNT_ID` in Vercel only to override them
+(dashes/spaces in ids are fine either way).
 Troubleshooting, both password-protected via `&key=`:
 `/api/metrics/ads?debug=1` (unmetered) lists the PaidSync tool schemas;
 `/api/metrics/ads?discover=1` (one metered call per channel) relays
