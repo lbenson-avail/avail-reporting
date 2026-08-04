@@ -139,18 +139,25 @@ async function compute({ startMs, endMs, ownerIds }) {
     ]);
     // Portal properties normalize hyphenated stage IDs and append a numeric
     // suffix (hs_v2_date_entered_attempting_stage_id_745667965), so match on
-    // containment, not suffix. Legacy hs_date_entered_* variants aren't listed
-    // in the schema but still return data — derive them from each v2 match.
+    // containment, not suffix.
     for (const p of portalEnteredProps || []) {
       if (p.includes(`date_entered_${norm(id)}`) || p.includes(`date_entered_${id}`)) {
         candidates.add(p);
-        if (p.startsWith('hs_v2_')) candidates.add(p.replace('hs_v2_', 'hs_'));
       }
     }
-    // Prefer v2 properties (sort puts hs_v2_* after hs_date_* — iterate v2 first).
-    roleEnteredProps[role] = [...candidates].sort((a, b) =>
-      a.startsWith('hs_v2') === b.startsWith('hs_v2') ? 0 : a.startsWith('hs_v2') ? -1 : 1
+    // The legacy hs_date_entered_* timestamps are stamped on leads that never
+    // actually reached the stage (portal data showed 21/29 "ever qualified"
+    // against ~11 real), so when the schema confirms a v2 property exists we
+    // trust it EXCLUSIVELY. The mixed candidate list survives only as a
+    // degraded fallback when the schema is unreadable.
+    const v2Confirmed = [...candidates].filter(
+      (p) => p.startsWith('hs_v2_') && portalEnteredProps?.includes(p)
     );
+    roleEnteredProps[role] = v2Confirmed.length
+      ? v2Confirmed
+      : [...candidates].sort((a, b) =>
+          a.startsWith('hs_v2') === b.startsWith('hs_v2') ? 0 : a.startsWith('hs_v2') ? -1 : 1
+        );
   }
   const roleProps = Object.values(roleEnteredProps).flat();
   const enteredAt = (lead, role) => {
