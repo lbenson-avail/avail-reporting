@@ -49,14 +49,24 @@ async function resolveTool(channel) {
 
 async function resolveAccountTools() {
   const tools = await paidsyncListTools();
+  // A true lister enumerates accounts — reject summary/report-style tools
+  // (get_account_summary needs an active account itself, so picking it as
+  // the lister is a chicken-and-egg failure).
   const accountish = tools.filter(
-    (t) => /account/i.test(t.name) && /(list|get|available|connected)/i.test(t.name) && !/set/i.test(t.name)
+    (t) =>
+      /account/i.test(t.name) &&
+      !/set|summary|performance|report|overview|metric/i.test(t.name) &&
+      (/accounts/i.test(t.name) || /(list|available|connected)/i.test(t.name))
   );
   const lister = accountish.find((t) => /list/i.test(t.name)) || accountish[0];
   const setter =
     tools.find((t) => t.name === 'set_active_account') ||
     tools.find((t) => /set.*account/i.test(t.name));
-  return { lister, setter };
+  const accountToolNames = tools
+    .filter((t) => /account/i.test(t.name))
+    .map((t) => t.name)
+    .join(', ');
+  return { lister, setter, accountToolNames };
 }
 
 // Caches the in-flight promise so concurrent channels share one metered call.
@@ -178,12 +188,24 @@ export async function getChannelMetrics(channel, startMs, endMs) {
     // Account targeting. Metering: a cold instance worst-cases at 5 metered
     // calls per cache window (1 list + a set + report pair per channel) —
     // the 12h cache keeps that to a handful a day.
-    const { lister, setter } = await resolveAccountTools();
+    const { lister, setter, accountToolNames } = await resolveAccountTools();
     let account = null;
     if (process.env[CHANNELS[channel].accountEnv]) {
       account = pickAccount([], channel);
     } else if (lister) {
-      const accounts = await getAccounts(lister);
+      let accounts;
+      try {
+        accounts = await getAccounts(lister);
+      } catch (err) {
+        return {
+          unavailable: true,
+          reason: `Listing PaidSync ad accounts via ${lister.name} failed: ${String(
+            err.message
+          ).slice(0, 200)}. Account tools in the catalog: ${accountToolNames || 'none'}. Set ${
+            CHANNELS[channel].accountEnv
+          } in Vercel to skip listing.`,
+        };
+      }
       account = pickAccount(accounts, channel);
       if (!account) {
         return {
@@ -193,6 +215,17 @@ export async function getChannelMetrics(channel, startMs, endMs) {
           }. Connect it at paidsync.ai, or set ${CHANNELS[channel].accountEnv} in Vercel.`,
         };
       }
+    } else if (setter) {
+      // PaidSync wants set_active_account but exposes no way to discover
+      // account ids — needs the id from env or the account set at paidsync.ai.
+      return {
+        unavailable: true,
+        reason: `PaidSync has no account-listing tool to find the ${
+          CHANNELS[channel].label
+        } account id (account tools: ${accountToolNames || 'none'}). Set ${
+          CHANNELS[channel].accountEnv
+        } in Vercel with the account id from paidsync.ai, or check /api/metrics/ads?debug=1.`,
+      };
     }
 
     const accountKey = ['account_id', 'customer_id', 'account'].find((k) => schemaProps[k]);
@@ -246,6 +279,7 @@ export async function adsDebugInfo() {
   );
   return {
     totalTools: tools.length,
+    allToolNames: tools.map((t) => t.name),
     tools: interesting.slice(0, 60).map((t) => ({
       name: t.name,
       description: (t.description || '').slice(0, 160),
