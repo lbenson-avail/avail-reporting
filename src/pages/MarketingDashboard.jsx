@@ -324,7 +324,7 @@ export default function MarketingDashboard() {
           </Card>
         </section>
 
-        <section aria-label="Channels" className="grid grid-cols-1 gap-4 lg:grid-cols-2 2xl:grid-cols-4">
+        <section aria-label="Channels" className="grid grid-cols-1 gap-4 lg:grid-cols-2">
           <ChannelCard
             def={MARKETING_DEFS.paidSearch}
             icon={<GoogleIcon />}
