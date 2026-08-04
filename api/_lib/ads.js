@@ -104,9 +104,13 @@ function getAccounts(lister) {
   return promise;
 }
 
+// Ad platforms want bare ids — tolerate the human-formatted versions
+// (Google shows customer ids as XXX-XXX-XXXX).
+const normalizeAccountId = (v) => String(v).trim().replace(/[\s-]+/g, '');
+
 function pickAccount(accounts, channel) {
   const envId = process.env[CHANNELS[channel].accountEnv];
-  if (envId) return { id: envId, name: '(from env)' };
+  if (envId) return { id: normalizeAccountId(envId), name: '(from env)' };
   const { match } = CHANNELS[channel];
   return accounts.find((a) => match.test(`${a.platform} ${a.name}`)) || null;
 }
@@ -200,7 +204,8 @@ export async function getChannelMetrics(channel, startMs, endMs) {
     // calls per cache window (1 list + a set + report pair per channel) —
     // the 12h cache keeps that to a handful a day.
     const { lister, setter, accountToolNames } = await resolveAccountTools(channel);
-    let accountId = process.env[CHANNELS[channel].accountEnv] || null;
+    const envId = process.env[CHANNELS[channel].accountEnv];
+    let accountId = envId ? normalizeAccountId(envId) : null;
     if (!accountId && lister) {
       let accounts;
       try {
@@ -281,6 +286,34 @@ export async function getChannelMetrics(channel, startMs, endMs) {
       reason: `${CHANNELS[channel].label} via PaidSync failed: ${String(err.message).slice(0, 300)}`,
     };
   }
+}
+
+// One metered probe per channel: call the channel's resolved account setter
+// with whatever id we have (env, normalized) or none, and relay PaidSync's
+// raw response verbatim. PaidSync's errors state their contract precisely,
+// so this turns "why won't spend connect" into a single URL visit.
+export async function adsDiscover() {
+  if (!paidsyncConfigured()) return { error: 'PAIDSYNC_API_KEY not set' };
+  const out = {};
+  for (const channel of Object.keys(CHANNELS)) {
+    const { setter, accountToolNames } = await resolveAccountTools(channel);
+    const envId = process.env[CHANNELS[channel].accountEnv];
+    const accountId = envId ? normalizeAccountId(envId) : null;
+    if (!setter) {
+      out[channel] = { error: `no account setter found (account tools: ${accountToolNames || 'none'})` };
+      continue;
+    }
+    const setterProps = setter.inputSchema?.properties || {};
+    const setterKey = ['account_id', 'customer_id', 'account', 'id'].find((k) => setterProps[k]);
+    const args = setterKey && accountId ? { [setterKey]: accountId } : {};
+    try {
+      const result = await withAccountLock(() => paidsyncCallTool(setter.name, args));
+      out[channel] = { setter: setter.name, args, result };
+    } catch (err) {
+      out[channel] = { setter: setter.name, args, error: String(err.message).slice(0, 600) };
+    }
+  }
+  return out;
 }
 
 // Unmetered introspection for finalizing the integration: the relevant tool
