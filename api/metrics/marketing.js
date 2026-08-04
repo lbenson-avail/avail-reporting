@@ -20,6 +20,7 @@ import {
   hsSearchAll,
   getLeadStages,
   getLeadPropertyNames,
+  getLeadPropertyDef,
   getPortalId,
   ownerFilter,
   rangeFilter,
@@ -52,6 +53,25 @@ async function compute({ startMs, endMs, ownerIds }) {
 
   const sourceProp = resolveProp(portalProps, PROPS.leadSource, 'lead_source');
   const typeProp = resolveProp(portalProps, PROPS.leadType, 'lead_type');
+
+  // Enum properties store internal values that can differ from the display
+  // labels the spec (and humans) use — fetch the definitions and normalize
+  // every raw value through internal-value → label → canonical bucket.
+  const [sourceDef, typeDef] = await Promise.all([
+    getLeadPropertyDef(sourceProp.name),
+    getLeadPropertyDef(typeProp.name),
+  ]);
+  const optionLabels = (def) =>
+    new Map((def?.options || []).map((o) => [String(o.value), o.label]));
+  const sourceLabels = optionLabels(sourceDef);
+  const typeLabels = optionLabels(typeDef);
+  const canonicalSources = new Map(LEAD_SOURCES.map((s) => [s.toLowerCase(), s]));
+  const canonicalTypes = new Map(LEAD_TYPES.map((t) => [t.toLowerCase(), t]));
+  const normalize = (raw, labels, canonical) => {
+    if (raw == null || raw === '') return null;
+    const label = labels.get(String(raw)) ?? String(raw);
+    return canonical.get(label.trim().toLowerCase()) ?? label;
+  };
   const disqualifyNoteProps = (portalProps || []).filter(
     (n) =>
       /disqualif/i.test(n) &&
@@ -82,7 +102,8 @@ async function compute({ startMs, endMs, ownerIds }) {
 
   const p = (l, name) => l.properties?.[name] ?? null;
   const stageOf = (l) => p(l, 'hs_pipeline_stage');
-  const sourceOf = (l) => p(l, sourceProp.name);
+  const sourceOf = (l) => normalize(p(l, sourceProp.name), sourceLabels, canonicalSources);
+  const typeOf = (l) => normalize(p(l, typeProp.name), typeLabels, canonicalTypes);
 
   // Company names — needed for dedup and the disqualified table.
   const companyNames =
@@ -148,7 +169,7 @@ async function compute({ startMs, endMs, ownerIds }) {
 
   const leadTypes = LEAD_TYPES.map((t) => ({
     type: t,
-    count: results.filter((l) => p(l, typeProp.name) === t).length,
+    count: results.filter((l) => typeOf(l) === t).length,
   }));
 
   const perRep = ownerIds.map((ownerId) => {
@@ -212,8 +233,22 @@ async function compute({ startMs, endMs, ownerIds }) {
       disqualified: { shown: disqualifiedRows.length, total: disqualifiedLeads.length },
     },
     diagnostics: {
-      leadSourceProp: sourceProp,
-      leadTypeProp: typeProp,
+      leadSourceProp: {
+        ...sourceProp,
+        optionCount: sourceLabels.size,
+        // Distinct raw → resolved pairs actually seen in this range, so a
+        // mismatch is diagnosable straight from the response.
+        seen: [...new Set(results.map((l) => p(l, sourceProp.name)).filter(Boolean))]
+          .slice(0, 12)
+          .map((raw) => ({ raw, resolved: normalize(raw, sourceLabels, canonicalSources) })),
+      },
+      leadTypeProp: {
+        ...typeProp,
+        optionCount: typeLabels.size,
+        seen: [...new Set(results.map((l) => p(l, typeProp.name)).filter(Boolean))]
+          .slice(0, 12)
+          .map((raw) => ({ raw, resolved: normalize(raw, typeLabels, canonicalTypes) })),
+      },
     },
     truncated,
     fetchedAt: new Date().toISOString(),

@@ -180,6 +180,22 @@ export async function getLeadPropertyNames() {
   return leadPropNamesCache;
 }
 
+// Full definition of a single lead property (enum options carry the
+// internal-value → display-label mapping). Cached per instance.
+const leadPropDefCache = new Map();
+
+export async function getLeadPropertyDef(name) {
+  if (leadPropDefCache.has(name)) return leadPropDefCache.get(name);
+  let def = null;
+  try {
+    def = await hsFetch(`/crm/v3/properties/leads/${encodeURIComponent(name)}`);
+  } catch {
+    /* unreadable — callers fall back to raw values */
+  }
+  leadPropDefCache.set(name, def);
+  return def;
+}
+
 // HubSpot portal id — needed to build record deep-links. Cached per instance.
 let portalIdCache;
 let portalIdCacheAt = 0;
