@@ -47,7 +47,7 @@ async function resolveTool(channel) {
 // Discover the account lister/setter tools from the unmetered catalog, list
 // the connected accounts once (metered, cached), and pick per channel.
 
-async function resolveAccountTools() {
+async function resolveAccountTools(channel) {
   const tools = await paidsyncListTools();
   // A true lister enumerates accounts — reject summary/report-style tools
   // (get_account_summary needs an active account itself, so picking it as
@@ -59,9 +59,17 @@ async function resolveAccountTools() {
       (/accounts/i.test(t.name) || /(list|available|connected)/i.test(t.name))
   );
   const lister = accountish.find((t) => /list/i.test(t.name)) || accountish[0];
+  // PaidSync ships per-platform setters (set_linkedin_ad_account,
+  // set_fb_ad_account, …) alongside the generic set_active_account, which
+  // its own errors tie to Google Ads. Prefer the channel's setter.
+  const { match } = CHANNELS[channel];
+  const setters = tools.filter(
+    (t) => /set/i.test(t.name) && /account/i.test(t.name) && !/clear/i.test(t.name)
+  );
   const setter =
+    setters.find((t) => match.test(t.name) || match.test(t.description || '')) ||
     tools.find((t) => t.name === 'set_active_account') ||
-    tools.find((t) => /set.*account/i.test(t.name));
+    setters.find((t) => /active/i.test(t.name));
   const accountToolNames = tools
     .filter((t) => /account/i.test(t.name))
     .map((t) => t.name)
@@ -188,11 +196,9 @@ export async function getChannelMetrics(channel, startMs, endMs) {
     // Account targeting. Metering: a cold instance worst-cases at 5 metered
     // calls per cache window (1 list + a set + report pair per channel) —
     // the 12h cache keeps that to a handful a day.
-    const { lister, setter, accountToolNames } = await resolveAccountTools();
-    let account = null;
-    if (process.env[CHANNELS[channel].accountEnv]) {
-      account = pickAccount([], channel);
-    } else if (lister) {
+    const { lister, setter, accountToolNames } = await resolveAccountTools(channel);
+    let accountId = process.env[CHANNELS[channel].accountEnv] || null;
+    if (!accountId && lister) {
       let accounts;
       try {
         accounts = await getAccounts(lister);
@@ -206,7 +212,7 @@ export async function getChannelMetrics(channel, startMs, endMs) {
           } in Vercel to skip listing.`,
         };
       }
-      account = pickAccount(accounts, channel);
+      const account = pickAccount(accounts, channel);
       if (!account) {
         return {
           unavailable: true,
@@ -215,33 +221,38 @@ export async function getChannelMetrics(channel, startMs, endMs) {
           }. Connect it at paidsync.ai, or set ${CHANNELS[channel].accountEnv} in Vercel.`,
         };
       }
-    } else if (setter) {
-      // PaidSync wants set_active_account but exposes no way to discover
-      // account ids — needs the id from env or the account set at paidsync.ai.
-      return {
-        unavailable: true,
-        reason: `PaidSync has no account-listing tool to find the ${
-          CHANNELS[channel].label
-        } account id (account tools: ${accountToolNames || 'none'}). Set ${
-          CHANNELS[channel].accountEnv
-        } in Vercel with the account id from paidsync.ai, or check /api/metrics/ads?debug=1.`,
-      };
+      accountId = account.id;
     }
 
     const accountKey = ['account_id', 'customer_id', 'account'].find((k) => schemaProps[k]);
     let report;
-    if (account?.id && accountKey) {
+    if (accountId && accountKey) {
       // Cheapest path: the report tool accepts the account inline.
-      args[accountKey] = account.id;
+      args[accountKey] = accountId;
       report = await paidsyncCallTool(tool.name, args);
-    } else if (account?.id && setter) {
+    } else if (setter) {
+      // Select the channel's account, then report. The per-platform setters
+      // know their connected account, so an explicit id is optional — but if
+      // the setter's schema requires one we don't have, say so instead of
+      // burning a metered call on a guaranteed failure.
+      const setterProps = setter.inputSchema?.properties || {};
+      const setterKey = ['account_id', 'customer_id', 'account', 'id'].find(
+        (k) => setterProps[k]
+      );
+      const setterRequired = setter.inputSchema?.required || [];
+      if (!accountId && setterKey && setterRequired.includes(setterKey)) {
+        return {
+          unavailable: true,
+          reason: `PaidSync's ${setter.name} requires an account id and none is discoverable (account tools: ${
+            accountToolNames || 'none'
+          }). Set ${CHANNELS[channel].accountEnv} in Vercel with the id from paidsync.ai.`,
+        };
+      }
+      const setterArgs = setterKey && accountId ? { [setterKey]: accountId } : {};
       // Active account is PaidSync-side session state — serialize the
       // set→report pair so the two channels never interleave.
-      const setterProps = setter.inputSchema?.properties || {};
-      const setterKey =
-        ['account_id', 'customer_id', 'account', 'id'].find((k) => setterProps[k]) || 'account_id';
       report = await withAccountLock(async () => {
-        await paidsyncCallTool(setter.name, { [setterKey]: account.id });
+        await paidsyncCallTool(setter.name, setterArgs);
         return paidsyncCallTool(tool.name, args);
       });
     } else {
