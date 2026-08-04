@@ -7,6 +7,7 @@ import {
   startOfQuarter,
   startOfYear,
   subDays,
+  subMonths,
 } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
@@ -16,8 +17,15 @@ import { Separator } from '@/components/ui/separator';
 const toParam = (d) => format(d, 'yyyy-MM-dd');
 
 export function buildPresets(now = new Date()) {
+  const lastMonth = subMonths(now, 1);
   return [
     { key: 'this-month', label: 'This month', start: startOfMonth(now), end: now },
+    {
+      key: 'last-month',
+      label: 'Last month',
+      start: startOfMonth(lastMonth),
+      end: endOfMonth(lastMonth),
+    },
     { key: 'last-30', label: 'Last 30 days', start: subDays(now, 29), end: now },
     { key: 'last-90', label: 'Last 90 days', start: subDays(now, 89), end: now },
     { key: 'qtd', label: 'Quarter to date', start: startOfQuarter(now), end: now },

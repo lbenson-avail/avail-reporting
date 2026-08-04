@@ -1,9 +1,17 @@
-# Avail Sales Dashboard
+# Avail Reporting
 
-Live sales reporting dashboard for the Avail sales team. HubSpot is the source
-of truth; data is pulled on every load and auto-refreshes every 5 minutes.
+Live reporting product for the Avail team: a **Sales** dashboard and a
+**Marketing** dashboard behind a left-hand nav. HubSpot is the source of
+truth; data is pulled on every load and auto-refreshes every 5 minutes.
 Scoped to the two sales reps configured in `lib/config.js` (Jonathan Hopkins &
 Steven Santa Ana) — everyone else's records are excluded from every metric.
+
+Ad-platform metrics (Google Ads spend/CPL, LinkedIn) flow through
+**PaidSync** (MCP-over-HTTP is PaidSync's API): set `PAIDSYNC_API_KEY` in
+Vercel to activate them. PaidSync meters per tool call, so ads data is cached
+server-side for `ADS_CACHE_TTL_HOURS` (default 12) instead of polling.
+`/api/metrics/ads?debug=1` (password-protected, unmetered) lists the PaidSync
+tool schemas for finalizing/adjusting the integration.
 
 **Stack**: Vite + React 19, Tailwind v4 + shadcn/ui, Recharts. Vercel serverless
 functions (`/api`) proxy HubSpot so the private-app token never reaches the
