@@ -103,6 +103,15 @@ export async function compute({ startMs, endMs, ownerIds }) {
   // Lead Source for the list columns — same resolver the marketing page uses.
   const source = await getLeadSourceResolver(portalProps);
 
+  // Last-activity timestamp for the list columns. The rollup property's name
+  // is object/portal-specific, so resolve against the schema: an explicit
+  // last/latest-activity date first, then HubSpot's notes_last_updated
+  // rollup, then record-modified time (always present) as the floor.
+  const lastActivityProp =
+    (portalProps || []).find((n) => /^(hs_)?(last|latest)_?activity_?date$/i.test(n)) ||
+    (portalProps || []).find((n) => n === 'notes_last_updated') ||
+    'hs_lastmodifieddate';
+
   const filters = [ownerFilter(ownerIds)];
   if (startMs != null) filters.push(rangeFilter(PROPS.leadCreateDate, startMs, endMs));
 
@@ -116,6 +125,7 @@ export async function compute({ startMs, endMs, ownerIds }) {
       PROPS.leadIcpFit,
       PROPS.leadDisqualifyReason,
       source.name,
+      lastActivityProp,
       ...disqualifyNoteProps,
       ...roleProps,
     ],
@@ -254,6 +264,8 @@ export async function compute({ startMs, endMs, ownerIds }) {
       icpFit: l.properties?.[PROPS.leadIcpFit] || null,
       qualifiedAt: enteredAt(l, 'qualified'),
       source: source.sourceOf(l),
+      createdAt: l.properties?.[PROPS.leadCreateDate] || null,
+      lastActivityAt: l.properties?.[lastActivityProp] || null,
       ownerId: l.properties?.hubspot_owner_id,
     })),
     disqualifiedList: disqualifiedRows.map((l) => ({
@@ -268,6 +280,8 @@ export async function compute({ startMs, endMs, ownerIds }) {
           .filter((v) => v && String(v).trim())
           .join(' · ') || null,
       source: source.sourceOf(l),
+      createdAt: l.properties?.[PROPS.leadCreateDate] || null,
+      lastActivityAt: l.properties?.[lastActivityProp] || null,
       ownerId: l.properties?.hubspot_owner_id,
     })),
     unscoredList: unscoredRows.map((l) => ({
@@ -276,6 +290,8 @@ export async function compute({ startMs, endMs, ownerIds }) {
       company: companyNames.get(String(l.id)),
       stageLabel: stageLabel.get(l.properties?.hs_pipeline_stage) || null,
       source: source.sourceOf(l),
+      createdAt: l.properties?.[PROPS.leadCreateDate] || null,
+      lastActivityAt: l.properties?.[lastActivityProp] || null,
       ownerId: l.properties?.hubspot_owner_id,
     })),
     listCaps: {

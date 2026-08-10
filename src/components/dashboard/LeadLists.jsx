@@ -84,6 +84,18 @@ export function LeadLists({ leads, tab, onTabChange }) {
                   { header: 'Source', render: sourceCell },
                   { header: 'Rep', render: (l) => ownerShort(l.ownerId) },
                   {
+                    header: 'Created',
+                    headClass: 'text-right',
+                    cellClass: 'text-right tabular-nums',
+                    render: (l) => fmtDate(l.createdAt),
+                  },
+                  {
+                    header: 'Last activity',
+                    headClass: 'text-right',
+                    cellClass: 'text-right tabular-nums',
+                    render: (l) => fmtDate(l.lastActivityAt),
+                  },
+                  {
                     header: 'Qualified',
                     headClass: 'text-right',
                     cellClass: 'text-right tabular-nums',
@@ -112,6 +124,18 @@ export function LeadLists({ leads, tab, onTabChange }) {
                   },
                   { header: 'Source', render: sourceCell },
                   { header: 'Rep', render: (l) => ownerShort(l.ownerId) },
+                  {
+                    header: 'Created',
+                    headClass: 'text-right',
+                    cellClass: 'text-right tabular-nums',
+                    render: (l) => fmtDate(l.createdAt),
+                  },
+                  {
+                    header: 'Last activity',
+                    headClass: 'text-right',
+                    cellClass: 'text-right tabular-nums',
+                    render: (l) => fmtDate(l.lastActivityAt),
+                  },
                 ]}
               />
             </TabsContent>
@@ -139,6 +163,18 @@ export function LeadLists({ leads, tab, onTabChange }) {
                   },
                   { header: 'Source', render: sourceCell },
                   { header: 'Rep', render: (l) => ownerShort(l.ownerId) },
+                  {
+                    header: 'Created',
+                    headClass: 'text-right',
+                    cellClass: 'text-right tabular-nums',
+                    render: (l) => fmtDate(l.createdAt),
+                  },
+                  {
+                    header: 'Last activity',
+                    headClass: 'text-right',
+                    cellClass: 'text-right tabular-nums',
+                    render: (l) => fmtDate(l.lastActivityAt),
+                  },
                 ]}
               />
             </TabsContent>
