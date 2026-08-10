@@ -168,12 +168,12 @@ export async function compute({ startMs, endMs, ownerIds }) {
     ),
   };
 
-  // ICP fit distribution.
+  // ICP fit distribution. The unscored count is defined once, below, shared
+  // with the Unscored list so the card number and the list always agree.
   const icpCounts = ICP_CATEGORIES.map((cat) => ({
     category: cat,
     count: results.filter((l) => (l.properties?.[PROPS.leadIcpFit] || '') === cat).length,
   }));
-  const icpUnscored = results.filter((l) => !l.properties?.[PROPS.leadIcpFit]).length;
 
   // Rep vs rep — funnel counts: leads that have EVER entered each stage,
   // so the columns read left-to-right as a funnel even as leads keep moving.
@@ -240,7 +240,7 @@ export async function compute({ startMs, endMs, ownerIds }) {
     speedToLead,
     reachingToConnected,
     timingDiagnostics,
-    icp: { counts: icpCounts, unscored: icpUnscored },
+    icp: { counts: icpCounts, unscored: unscoredLeads.length },
     repBreakdown,
     qualifiedList: qualifiedRows.map((l) => ({
       id: l.id,
