@@ -13,6 +13,9 @@ const ownerShort = (ownerId) => SALES_OWNERS.find((o) => o.id === ownerId)?.shor
 
 
 
+const sourceCell = (l) =>
+  l.source ? <Badge variant="outline">{l.source}</Badge> : <span className="text-muted-foreground">—</span>;
+
 // Pills wear the exact same tokens as the ICP Fit Ratings bars.
 const icpCell = (l) =>
   l.icpFit ? (
@@ -78,6 +81,7 @@ export function LeadLists({ leads, tab, onTabChange }) {
                   },
                   { header: 'Lead', render: (l) => l.name || '—' },
                   { header: 'ICP Fit', render: icpCell },
+                  { header: 'Source', render: sourceCell },
                   { header: 'Rep', render: (l) => ownerShort(l.ownerId) },
                   {
                     header: 'Qualified',
@@ -106,6 +110,7 @@ export function LeadLists({ leads, tab, onTabChange }) {
                     cellClass: 'max-w-72 truncate',
                     render: (l) => <ReasonCell reason={l.reason} notes={l.notes} />,
                   },
+                  { header: 'Source', render: sourceCell },
                   { header: 'Rep', render: (l) => ownerShort(l.ownerId) },
                 ]}
               />
@@ -132,6 +137,7 @@ export function LeadLists({ leads, tab, onTabChange }) {
                         '—'
                       ),
                   },
+                  { header: 'Source', render: sourceCell },
                   { header: 'Rep', render: (l) => ownerShort(l.ownerId) },
                 ]}
               />

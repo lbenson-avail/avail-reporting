@@ -15,6 +15,7 @@ import { requireAuth } from '../_lib/auth.js';
 import { parseParams } from '../_lib/params.js';
 import { cached } from '../_lib/cache.js';
 import { resolveCompanies } from '../_lib/companies.js';
+import { getLeadSourceResolver } from '../_lib/leadSource.js';
 import {
   hsFetch,
   hsSearchAll,
@@ -99,6 +100,9 @@ export async function compute({ startMs, endMs, ownerIds }) {
     return null;
   };
 
+  // Lead Source for the list columns — same resolver the marketing page uses.
+  const source = await getLeadSourceResolver(portalProps);
+
   const filters = [ownerFilter(ownerIds)];
   if (startMs != null) filters.push(rangeFilter(PROPS.leadCreateDate, startMs, endMs));
 
@@ -111,6 +115,7 @@ export async function compute({ startMs, endMs, ownerIds }) {
       PROPS.leadName,
       PROPS.leadIcpFit,
       PROPS.leadDisqualifyReason,
+      source.name,
       ...disqualifyNoteProps,
       ...roleProps,
     ],
@@ -248,6 +253,7 @@ export async function compute({ startMs, endMs, ownerIds }) {
       company: companyNames.get(String(l.id)),
       icpFit: l.properties?.[PROPS.leadIcpFit] || null,
       qualifiedAt: enteredAt(l, 'qualified'),
+      source: source.sourceOf(l),
       ownerId: l.properties?.hubspot_owner_id,
     })),
     disqualifiedList: disqualifiedRows.map((l) => ({
@@ -261,6 +267,7 @@ export async function compute({ startMs, endMs, ownerIds }) {
           .map((p) => l.properties?.[p])
           .filter((v) => v && String(v).trim())
           .join(' · ') || null,
+      source: source.sourceOf(l),
       ownerId: l.properties?.hubspot_owner_id,
     })),
     unscoredList: unscoredRows.map((l) => ({
@@ -268,6 +275,7 @@ export async function compute({ startMs, endMs, ownerIds }) {
       name: l.properties?.[PROPS.leadName] || null,
       company: companyNames.get(String(l.id)),
       stageLabel: stageLabel.get(l.properties?.hs_pipeline_stage) || null,
+      source: source.sourceOf(l),
       ownerId: l.properties?.hubspot_owner_id,
     })),
     listCaps: {

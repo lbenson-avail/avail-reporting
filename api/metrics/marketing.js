@@ -28,22 +28,11 @@ import {
   HsError,
 } from '../_lib/hubspot.js';
 
+import { getLeadSourceResolver, resolveProp } from '../_lib/leadSource.js';
+
 // Company resolution powers dedup; past this many leads we skip it and report
 // the raw count (flagged in the response) rather than hammer the API.
 const DEDUP_CAP = 500;
-
-// Resolve a configured custom property against the portal schema, accepting
-// close variants (lead_source vs hs_lead_source vs *_lead_source).
-function resolveProp(portalProps, configured, stem) {
-  if (!portalProps) return { name: configured, verified: false };
-  if (portalProps.includes(configured)) return { name: configured, verified: true };
-  const candidate = portalProps.find(
-    (n) => n === stem || n.endsWith(`_${stem}`) || n === `hs_${stem}`
-  );
-  return candidate
-    ? { name: candidate, verified: true }
-    : { name: configured, verified: false };
-}
 
 export async function compute({ startMs, endMs, ownerIds }) {
   const [{ roles }, portalProps, portalId] = await Promise.all([
@@ -52,20 +41,14 @@ export async function compute({ startMs, endMs, ownerIds }) {
     getPortalId(),
   ]);
 
-  const sourceProp = resolveProp(portalProps, PROPS.leadSource, 'lead_source');
-  const typeProp = resolveProp(portalProps, PROPS.leadType, 'lead_type');
-
   // Enum properties store internal values that can differ from the display
-  // labels the spec (and humans) use — fetch the definitions and normalize
-  // every raw value through internal-value → label → canonical bucket.
-  const [sourceDef, typeDef] = await Promise.all([
-    getLeadPropertyDef(sourceProp.name),
-    getLeadPropertyDef(typeProp.name),
-  ]);
-  const optionLabels = (def) =>
-    new Map((def?.options || []).map((o) => [String(o.value), o.label]));
-  const sourceLabels = optionLabels(sourceDef);
-  const typeLabels = optionLabels(typeDef);
+  // labels the spec (and humans) use — normalize every raw value through
+  // internal-value → label → canonical bucket. Source resolution is shared
+  // with the sales endpoint (api/_lib/leadSource.js).
+  const source = await getLeadSourceResolver(portalProps);
+  const typeProp = resolveProp(portalProps, PROPS.leadType, 'lead_type');
+  const typeDef = await getLeadPropertyDef(typeProp.name);
+  const typeLabels = new Map((typeDef?.options || []).map((o) => [String(o.value), o.label]));
   const canonicalSources = new Map(LEAD_SOURCES.map((s) => [s.toLowerCase(), s]));
   const canonicalTypes = new Map(LEAD_TYPES.map((t) => [t.toLowerCase(), t]));
   const normalize = (raw, labels, canonical) => {
@@ -95,7 +78,7 @@ export async function compute({ startMs, endMs, ownerIds }) {
       PROPS.leadIcpFit,
       PROPS.leadDisqualifyReason,
       ...disqualifyNoteProps,
-      sourceProp.name,
+      source.name,
       typeProp.name,
     ],
     sorts: [{ propertyName: PROPS.leadCreateDate, direction: 'DESCENDING' }],
@@ -103,7 +86,7 @@ export async function compute({ startMs, endMs, ownerIds }) {
 
   const p = (l, name) => l.properties?.[name] ?? null;
   const stageOf = (l) => p(l, 'hs_pipeline_stage');
-  const sourceOf = (l) => normalize(p(l, sourceProp.name), sourceLabels, canonicalSources);
+  const sourceOf = (l) => source.sourceOf(l);
   const typeOf = (l) => normalize(p(l, typeProp.name), typeLabels, canonicalTypes);
 
   // Company names — needed for dedup and the disqualified table.
@@ -248,13 +231,14 @@ export async function compute({ startMs, endMs, ownerIds }) {
     },
     diagnostics: {
       leadSourceProp: {
-        ...sourceProp,
-        optionCount: sourceLabels.size,
+        name: source.name,
+        verified: source.verified,
+        optionCount: source.optionCount,
         // Distinct raw → resolved pairs actually seen in this range, so a
         // mismatch is diagnosable straight from the response.
-        seen: [...new Set(results.map((l) => p(l, sourceProp.name)).filter(Boolean))]
+        seen: [...new Set(results.map((l) => p(l, source.name)).filter(Boolean))]
           .slice(0, 12)
-          .map((raw) => ({ raw, resolved: normalize(raw, sourceLabels, canonicalSources) })),
+          .map((raw) => ({ raw, resolved: source.resolveRaw(raw) })),
       },
       leadTypeProp: {
         ...typeProp,
