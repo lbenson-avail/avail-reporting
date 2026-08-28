@@ -1,0 +1,106 @@
+<!-- Avail Swag ROI Calculator — self-contained Webflow embed.
+     Paste into a Webflow Embed element. No external dependencies.
+     Assumptions: 70% time savings (reported client results), 15% of swag
+     spend recovered from overbuying/order errors/mismanaged inventory. -->
+<div class="aroi">
+<style>
+.aroi{--ink:#120a0b;--body:#454140;--mut:#666;--line:#e3e2e2;--bg:#f8f4f1;--card:#fff;--green:hsl(115.3,57.34%,32.2%);--greenD:hsl(115.3,57.34%,28%);--lime:#c9ff85;--purple:#9886fe;--r:10px;
+  font-family:Satoshi,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--body);letter-spacing:-.01em}
+.aroi *,.aroi *::before,.aroi *::after{box-sizing:border-box;margin:0;padding:0}
+.aroi-card{display:grid;grid-template-columns:1fr 1fr;gap:0;max-width:1060px;margin:0 auto;background:var(--card);border:1px solid var(--line);border-radius:20px;overflow:hidden}
+.aroi-in{padding:48px 44px}
+.aroi-h{color:var(--ink);font-size:32px;line-height:115%;font-weight:700;letter-spacing:-.03em;margin-bottom:10px}
+.aroi-sub{font-size:16px;line-height:1.55;margin-bottom:34px}
+.aroi-f{margin-bottom:28px}
+.aroi-f:last-child{margin-bottom:0}
+.aroi-lab{display:flex;justify-content:space-between;align-items:baseline;gap:12px;margin-bottom:10px}
+.aroi-lab label{color:var(--ink);font-size:15px;font-weight:500}
+.aroi-val{color:var(--ink);font-size:15px;font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}
+.aroi input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:22px;background:transparent;cursor:pointer}
+.aroi input[type=range]::-webkit-slider-runnable-track{height:6px;border-radius:3px;background:linear-gradient(to right,var(--ink) var(--p,50%),var(--line) var(--p,50%))}
+.aroi input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;height:22px;margin-top:-8px;border-radius:50%;background:var(--ink);border:4px solid #fff;box-shadow:0 1px 4px rgba(18,10,11,.35)}
+.aroi input[type=range]::-moz-range-track{height:6px;border-radius:3px;background:var(--line)}
+.aroi input[type=range]::-moz-range-progress{height:6px;border-radius:3px;background:var(--ink)}
+.aroi input[type=range]::-moz-range-thumb{width:14px;height:14px;border-radius:50%;background:var(--ink);border:4px solid #fff;box-shadow:0 1px 4px rgba(18,10,11,.35)}
+.aroi input[type=range]:focus-visible{outline:2px solid var(--purple);outline-offset:4px;border-radius:6px}
+.aroi-hint{font-size:12.5px;color:var(--mut);margin-top:7px}
+.aroi-out{background:var(--ink);color:#cfc9c7;padding:48px 44px;display:flex;flex-direction:column}
+.aroi-eyebrow{font-size:13px;font-weight:500;letter-spacing:.06em;text-transform:uppercase;color:var(--lime);margin-bottom:10px}
+.aroi-total{color:#fff;font-size:56px;line-height:1.05;font-weight:700;letter-spacing:-.03em;font-variant-numeric:tabular-nums}
+.aroi-per{font-size:15px;margin-top:6px;margin-bottom:26px}
+.aroi-row{display:flex;justify-content:space-between;align-items:baseline;gap:14px;padding:13px 0;border-top:1px solid rgba(255,255,255,.14);font-size:15px}
+.aroi-row b{color:#fff;font-size:17px;font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}
+.aroi-row span em{display:block;font-style:normal;font-size:12.5px;color:rgba(255,255,255,.55);margin-top:2px}
+.aroi-cta{display:inline-flex;justify-content:center;align-items:center;align-self:flex-start;margin-top:28px;padding:12px 24px;border-radius:100vw;background:var(--green);color:#fff;font-size:1.125rem;line-height:150%;font-weight:500;letter-spacing:-.02em;text-decoration:none;white-space:nowrap;transition:background-color .4s cubic-bezier(.165,.84,.44,1)}
+.aroi-cta:hover{background:var(--greenD)}
+.aroi-note{font-size:12px;line-height:1.55;color:rgba(255,255,255,.45);margin-top:auto;padding-top:26px}
+@media(max-width:860px){.aroi-card{grid-template-columns:1fr}.aroi-in,.aroi-out{padding:34px 24px}.aroi-total{font-size:44px}}
+</style>
+
+<div class="aroi-card">
+  <div class="aroi-in">
+    <h3 class="aroi-h">What is managing swag costing you?</h3>
+    <p class="aroi-sub">Move the sliders to see what your team gets back with Avail — in hours and in dollars.</p>
+
+    <div class="aroi-f">
+      <div class="aroi-lab"><label for="aroi-hrs">Hours per week spent on swag</label><span class="aroi-val" id="aroi-hrs-v">10 hrs</span></div>
+      <input type="range" id="aroi-hrs" min="1" max="40" step="1" value="10">
+      <p class="aroi-hint">Sourcing, vendor emails, proofing, kitting, shipping, tracking — per person.</p>
+    </div>
+
+    <div class="aroi-f">
+      <div class="aroi-lab"><label for="aroi-ppl">People managing swag</label><span class="aroi-val" id="aroi-ppl-v">1</span></div>
+      <input type="range" id="aroi-ppl" min="1" max="10" step="1" value="1">
+    </div>
+
+    <div class="aroi-f">
+      <div class="aroi-lab"><label for="aroi-rate">Their average hourly cost</label><span class="aroi-val" id="aroi-rate-v">$60/hr</span></div>
+      <input type="range" id="aroi-rate" min="25" max="150" step="5" value="60">
+      <p class="aroi-hint">Fully loaded — most swag owners are mid-to-senior marketers.</p>
+    </div>
+
+    <div class="aroi-f">
+      <div class="aroi-lab"><label for="aroi-spend">Annual swag spend</label><span class="aroi-val" id="aroi-spend-v">$50,000</span></div>
+      <input type="range" id="aroi-spend" min="5000" max="500000" step="5000" value="50000">
+    </div>
+  </div>
+
+  <div class="aroi-out" aria-live="polite">
+    <p class="aroi-eyebrow">Estimated annual value with Avail</p>
+    <p class="aroi-total" id="aroi-total">$0</p>
+    <p class="aroi-per" id="aroi-freed">—</p>
+
+    <div class="aroi-row"><span>Time back in your week<em>Avail clients report ~70% less time spent managing swag</em></span><b id="aroi-time">$0</b></div>
+    <div class="aroi-row"><span>Smarter spend<em>Overbuying, order errors &amp; mismanaged inventory caught — est. 15% of spend</em></span><b id="aroi-waste">$0</b></div>
+
+    <a class="aroi-cta" href="/book-a-demo">Book a demo</a>
+    <p class="aroi-note">Estimates based on reported Avail client results and typical program benchmarks. Your numbers depend on program size and complexity — we'll walk through them on the demo.</p>
+  </div>
+</div>
+
+<script>
+(function(){
+  var TIME_SAVED=0.70, WASTE=0.15, WEEKS=48; // working weeks/yr, conservative
+  var $=function(id){return document.getElementById(id)};
+  var els={hrs:$('aroi-hrs'),ppl:$('aroi-ppl'),rate:$('aroi-rate'),spend:$('aroi-spend')};
+  var usd=function(n){return '$'+Math.round(n).toLocaleString('en-US')};
+  function paint(el){var p=100*(el.value-el.min)/(el.max-el.min);el.style.setProperty('--p',p+'%')}
+  function calc(){
+    var hrs=+els.hrs.value, ppl=+els.ppl.value, rate=+els.rate.value, spend=+els.spend.value;
+    $('aroi-hrs-v').textContent=hrs+(hrs===1?' hr':' hrs');
+    $('aroi-ppl-v').textContent=ppl;
+    $('aroi-rate-v').textContent='$'+rate+'/hr';
+    $('aroi-spend-v').textContent=usd(spend);
+    var savedWk=hrs*ppl*TIME_SAVED, savedYr=savedWk*WEEKS;
+    var timeVal=savedYr*rate, wasteVal=spend*WASTE;
+    $('aroi-total').textContent=usd(timeVal+wasteVal)+'/yr';
+    $('aroi-freed').textContent=Math.round(savedYr).toLocaleString('en-US')+' hours freed up per year (~'+(Math.round(savedWk*10)/10)+' hrs/week)';
+    $('aroi-time').textContent=usd(timeVal)+'/yr';
+    $('aroi-waste').textContent=usd(wasteVal)+'/yr';
+    for(var k in els)paint(els[k]);
+  }
+  for(var k in els)els[k].addEventListener('input',calc);
+  calc();
+})();
+</script>
+</div>
