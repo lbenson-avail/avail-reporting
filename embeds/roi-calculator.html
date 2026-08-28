@@ -13,7 +13,7 @@
 .aroi-sub{font-size:16px;line-height:1.55;margin-bottom:34px}
 .aroi-f{margin-bottom:28px}
 .aroi-f:last-child{margin-bottom:0}
-.aroi-lab{display:flex;justify-content:space-between;align-items:baseline;gap:12px;margin-bottom:10px}
+.aroi-lab{display:flex;justify-content:space-between;align-items:baseline;gap:12px;margin-bottom:4px}
 .aroi-lab label{color:var(--ink);font-size:15px;font-weight:500}
 .aroi-val{color:var(--ink);font-size:15px;font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}
 .aroi input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:22px;background:transparent;cursor:pointer}
@@ -23,9 +23,9 @@
 .aroi input[type=range]::-moz-range-progress{height:6px;border-radius:3px;background:var(--blue)}
 .aroi input[type=range]::-moz-range-thumb{width:14px;height:14px;border-radius:50%;background:var(--blue);border:4px solid #fff;box-shadow:0 1px 4px rgba(4,90,255,.35)}
 .aroi input[type=range]:focus-visible{outline:2px solid var(--purple);outline-offset:4px;border-radius:6px}
-.aroi-hint{font-size:12.5px;color:var(--mut);margin-top:7px}
+.aroi-hint{font-size:13px;line-height:1.5;color:var(--mut);margin-bottom:12px}
 .aroi-out{background:var(--ink);color:#cfc9c7;padding:48px 44px;display:flex;flex-direction:column}
-.aroi-eyebrow{font-size:13px;font-weight:500;letter-spacing:.06em;text-transform:uppercase;color:var(--lime);margin-bottom:10px}
+.aroi-eyebrow{font-size:13px;font-weight:500;letter-spacing:.06em;text-transform:uppercase;color:#fff;margin-bottom:10px}
 .aroi-total{color:#fff;font-size:56px;line-height:1.05;font-weight:700;letter-spacing:-.03em;font-variant-numeric:tabular-nums}
 .aroi-per{font-size:15px;margin-top:6px;margin-bottom:26px}
 .aroi-row{display:flex;justify-content:space-between;align-items:baseline;gap:14px;padding:13px 0;border-top:1px solid rgba(255,255,255,.14);font-size:15px}
@@ -44,23 +44,25 @@
 
     <div class="aroi-f">
       <div class="aroi-lab"><label for="aroi-hrs">Hours per month spent on swag</label><span class="aroi-val" id="aroi-hrs-v">20 hrs</span></div>
+      <p class="aroi-hint">Count everything — emailing vendors back and forth, chasing proofs, fixing orders, packing and shipping boxes, updating the spreadsheet.</p>
       <input type="range" id="aroi-hrs" min="2" max="80" step="2" value="20">
-      <p class="aroi-hint">Sourcing, vendor emails, proofing, kitting, shipping, tracking — per person.</p>
     </div>
 
     <div class="aroi-f">
       <div class="aroi-lab"><label for="aroi-ppl">People managing swag</label><span class="aroi-val" id="aroi-ppl-v">1</span></div>
+      <p class="aroi-hint">Maybe it's one person's side job, or a few people pitching in across marketing, ops, and the front desk.</p>
       <input type="range" id="aroi-ppl" min="1" max="10" step="1" value="1">
     </div>
 
     <div class="aroi-f">
-      <div class="aroi-lab"><label for="aroi-rate">Their average hourly cost</label><span class="aroi-val" id="aroi-rate-v">$60/hr</span></div>
+      <div class="aroi-lab"><label for="aroi-rate">Average hourly cost</label><span class="aroi-val" id="aroi-rate-v">$60/hr</span></div>
+      <p class="aroi-hint">A rough number for what an hour of that time costs the business.</p>
       <input type="range" id="aroi-rate" min="25" max="150" step="5" value="60">
-      <p class="aroi-hint">Fully loaded — most swag owners are mid-to-senior marketers.</p>
     </div>
 
     <div class="aroi-f">
       <div class="aroi-lab"><label for="aroi-spend">Annual swag spend</label><span class="aroi-val" id="aroi-spend-v">$50,000</span></div>
+      <p class="aroi-hint">Your best guess at a year of branded merch — products, printing, shipping, storage.</p>
       <input type="range" id="aroi-spend" min="5000" max="500000" step="5000" value="50000">
     </div>
   </div>
