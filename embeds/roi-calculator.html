@@ -1,4 +1,4 @@
-<!-- Avail Swag ROI Calculator — self-contained Webflow embed.
+<!-- Avail Swag ROI Calculator: self-contained Webflow embed.
      Paste into a Webflow Embed element. No external dependencies.
      Assumptions: 70% time savings (reported client results), 15% of swag
      spend recovered from overbuying/order errors/mismanaged inventory. -->
@@ -9,8 +9,7 @@
 .aroi *,.aroi *::before,.aroi *::after{box-sizing:border-box;margin:0;padding:0}
 .aroi-card{display:grid;grid-template-columns:1fr 1fr;gap:0;max-width:1060px;margin:0 auto;background:var(--card);border:1px solid var(--line);border-radius:20px;overflow:hidden}
 .aroi-in{padding:48px 44px}
-.aroi-h{color:var(--ink);font-size:32px;line-height:115%;font-weight:700;letter-spacing:-.03em;margin-bottom:10px}
-.aroi-sub{font-size:16px;line-height:1.55;margin-bottom:34px}
+.aroi-h{color:var(--ink);font-size:32px;line-height:115%;font-weight:700;letter-spacing:-.03em;margin-bottom:30px}
 .aroi-f{margin-bottom:28px}
 .aroi-f:last-child{margin-bottom:0}
 .aroi-lab{display:flex;justify-content:space-between;align-items:baseline;gap:12px;margin-bottom:4px}
@@ -27,7 +26,7 @@
 .aroi-out{background:var(--ink);color:#cfc9c7;padding:48px 44px;display:flex;flex-direction:column}
 .aroi-eyebrow{font-size:13px;font-weight:500;letter-spacing:.06em;text-transform:uppercase;color:#fff;margin-bottom:10px}
 .aroi-total{color:#fff;font-size:56px;line-height:1.05;font-weight:700;letter-spacing:-.03em;font-variant-numeric:tabular-nums}
-.aroi-per{font-size:15px;margin-top:6px;margin-bottom:26px}
+.aroi-rows{margin-top:26px}
 .aroi-row{display:flex;justify-content:space-between;align-items:baseline;gap:14px;padding:13px 0;border-top:1px solid rgba(255,255,255,.14);font-size:15px}
 .aroi-row b{color:#fff;font-size:17px;font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}
 .aroi-row span em{display:block;font-style:normal;font-size:12.5px;color:rgba(255,255,255,.55);margin-top:2px}
@@ -40,17 +39,15 @@
 <div class="aroi-card">
   <div class="aroi-in">
     <h3 class="aroi-h">What is managing swag costing you?</h3>
-    <p class="aroi-sub">Move the sliders to see what your team gets back with Avail — in hours and in dollars.</p>
-
     <div class="aroi-f">
       <div class="aroi-lab"><label for="aroi-hrs">Hours per month spent on swag</label><span class="aroi-val" id="aroi-hrs-v">20 hrs</span></div>
-      <p class="aroi-hint">Count everything — emailing vendors back and forth, chasing proofs, fixing orders, packing and shipping boxes, updating the spreadsheet.</p>
+      <p class="aroi-hint">Emailing vendors back and forth, chasing proofs, fixing orders, packing and shipping boxes, updating the spreadsheet.</p>
       <input type="range" id="aroi-hrs" min="2" max="80" step="2" value="20">
     </div>
 
     <div class="aroi-f">
       <div class="aroi-lab"><label for="aroi-ppl">People managing swag</label><span class="aroi-val" id="aroi-ppl-v">1</span></div>
-      <p class="aroi-hint">Maybe it's one person's side job, or a few people pitching in across marketing, ops, and the front desk.</p>
+      <p class="aroi-hint">Maybe it's one person's side job, or a few people pitching in across marketing, people ops, and sales.</p>
       <input type="range" id="aroi-ppl" min="1" max="10" step="1" value="1">
     </div>
 
@@ -62,7 +59,7 @@
 
     <div class="aroi-f">
       <div class="aroi-lab"><label for="aroi-spend">Annual swag spend</label><span class="aroi-val" id="aroi-spend-v">$50,000</span></div>
-      <p class="aroi-hint">Your best guess at a year of branded merch — products, printing, shipping, storage.</p>
+      <p class="aroi-hint">What you spend on branded merch in a year, including products, printing, shipping, and storage.</p>
       <input type="range" id="aroi-spend" min="5000" max="500000" step="5000" value="50000">
     </div>
   </div>
@@ -70,13 +67,15 @@
   <div class="aroi-out" aria-live="polite">
     <p class="aroi-eyebrow">Estimated annual value with Avail</p>
     <p class="aroi-total" id="aroi-total">$0</p>
-    <p class="aroi-per" id="aroi-freed">—</p>
 
-    <div class="aroi-row"><span>Time back for your team<em>Avail clients report ~70% less time spent managing swag</em></span><b id="aroi-time">$0</b></div>
-    <div class="aroi-row"><span>Smarter spend<em>Overbuying, order errors &amp; mismanaged inventory caught — est. 15% of spend</em></span><b id="aroi-waste">$0</b></div>
+    <div class="aroi-rows">
+      <div class="aroi-row"><span>Time back for your team<em>Avail clients report about 70% less time spent managing swag</em></span><b id="aroi-hrs-saved">0 hrs/mo</b></div>
+      <div class="aroi-row"><span>What that time is worth<em>Those hours back, at your average hourly cost</em></span><b id="aroi-time">$0</b></div>
+      <div class="aroi-row"><span>Wasted spend recovered<em>Overbuying, order errors, and mismanaged inventory caught, est. 15% of spend</em></span><b id="aroi-waste">$0</b></div>
+    </div>
 
     <a class="aroi-cta" href="/book-a-demo">Book a demo</a>
-    <p class="aroi-note">Estimates based on reported Avail client results and typical program benchmarks. Your numbers depend on program size and complexity — we'll walk through them on the demo.</p>
+    <p class="aroi-note">Estimates based on reported Avail client results and typical program benchmarks. Every program is different, and we'll walk through your numbers on the demo.</p>
   </div>
 </div>
 
@@ -96,7 +95,7 @@
     var savedMo=hrs*ppl*TIME_SAVED, savedYr=savedMo*MONTHS;
     var timeVal=savedYr*rate, wasteVal=spend*WASTE;
     $('aroi-total').textContent=usd(timeVal+wasteVal)+'/yr';
-    $('aroi-freed').textContent=Math.round(savedYr).toLocaleString('en-US')+' hours freed up per year (~'+Math.round(savedMo)+' hrs/month)';
+    $('aroi-hrs-saved').textContent=Math.round(savedMo)+' hrs/mo';
     $('aroi-time').textContent=usd(timeVal)+'/yr';
     $('aroi-waste').textContent=usd(wasteVal)+'/yr';
     for(var k in els)paint(els[k]);
